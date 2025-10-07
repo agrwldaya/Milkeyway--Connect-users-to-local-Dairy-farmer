@@ -8,12 +8,15 @@ import consumerRouter from './routes/consumerRoute.js';
 import AdminRouter from './routes/adminRoute.js';
 import cors from 'cors';
 import authRouter from './routes/auth.js';
+import cookieParser from 'cookie-parser';
 
 const app = express();
 app.use(express.json());
 // Enable CORS for frontend with credentials (cookies)
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
 app.use(cors({ origin: FRONTEND_URL, credentials: true }));
+// Parse cookies so auth middleware can read JWT from httpOnly cookie
+app.use(cookieParser());
 app.set('trust proxy', 1);
 app.use(fileUpload({
   useTempFiles: true,

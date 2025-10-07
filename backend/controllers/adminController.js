@@ -66,22 +66,46 @@ const logAdminAction = async (adminId, targetId, actionType, reason = null) => {
 export const getAllFarmers = async (req, res) => {
   try {
     const query = `
-      SELECT * 
+      SELECT u.id, u.name, u.email, u.phone, u.status as user_status, u.created_at as user_created_at,
+             fp.id as farmer_profile_id, fp.farm_name, fp.address, fp.latitude, fp.longitude, fp.delivery_radius_km, fp.status as profile_status, fp.created_at as profile_created_at,
+             fd.is_doc_verified, fd.created_at as doc_created_at
       FROM users u
       JOIN farmer_profiles fp ON u.id = fp.user_id
+      LEFT JOIN farmer_docs fd ON fp.id = fd.farmer_id
       WHERE u.role = 'farmer'
       ORDER BY fp.created_at DESC;
     `;
 
     const result = await pool.query(query);
 
-    // Remove passwords from all farmer records
-    const sanitizedFarmers = result.rows.map(({ password, ...rest }) => rest);
+    // Structure the data properly
+    const farmers = result.rows.map(row => ({
+      id: row.id,
+      name: row.name,
+      email: row.email,
+      phone: row.phone,
+      user_status: row.user_status,
+      user_created_at: row.user_created_at,
+      profile: {
+        farmer_profile_id: row.farmer_profile_id,
+        farm_name: row.farm_name,
+        address: row.address,
+        latitude: row.latitude,
+        longitude: row.longitude,
+        delivery_radius_km: row.delivery_radius_km,
+        status: row.profile_status,
+        created_at: row.profile_created_at
+      },
+      documents: {
+        is_doc_verified: row.is_doc_verified || false,
+        doc_created_at: row.doc_created_at
+      }
+    }));
 
     res.status(200).json({
       success: true,
-      totalFarmers: sanitizedFarmers.length,
-      farmers: sanitizedFarmers,
+      totalFarmers: farmers.length,
+      farmers: farmers,
     });
   } catch (error) {
     console.error("Get Farmers Error:", error);
@@ -95,18 +119,17 @@ export const getAllFarmers = async (req, res) => {
 
 
 // 👁 Get specific farmer details
-// 👁 Get specific farmer details
 export const getFarmerById = async (req, res) => {
   try {
     const { id } = req.params;
 
     const result = await pool.query(`
-      SELECT u.id, u.name, u.email, u.role, u.phone,
-             fp.id AS farmer_profile_id, fp.farm_name, fp.address, fp.latitude, fp.longitude,fp.delivery_radius_km, fp.status,
-             d.id AS document_id, d.doc_type, d.file_url,d.uploaded_at
+      SELECT u.id, u.name, u.email, u.role, u.phone, u.status as user_status,
+             fp.id AS farmer_profile_id, fp.farm_name, fp.address, fp.latitude, fp.longitude, fp.delivery_radius_km, fp.status,
+             fd.farm_image_url, fd.farmer_image_url, fd.farmer_proof_doc_url, fd.is_doc_verified, fd.created_at as doc_created_at
       FROM users u
       JOIN farmer_profiles fp ON u.id = fp.user_id
-      JOIN documents d ON fp.id = d.farmer_id
+      LEFT JOIN farmer_docs fd ON fp.id = fd.farmer_id
       WHERE u.role = 'farmer' AND u.id = $1
     `, [id]);
 
@@ -114,28 +137,29 @@ export const getFarmerById = async (req, res) => {
       return res.status(404).json({ success: false, message: "Farmer not found" });
     }
 
-    // If multiple documents exist, group them
     const farmer = {
       id: result.rows[0].id,
       name: result.rows[0].name,
       email: result.rows[0].email,
+      phone: result.rows[0].phone,
       role: result.rows[0].role,
+      user_status: result.rows[0].user_status,
       profile: {
         farmer_profile_id: result.rows[0].farmer_profile_id,
-        address: result.rows[0].address,
-        phone: result.rows[0].phone,
         farm_name: result.rows[0].farm_name,
+        address: result.rows[0].address,
         latitude: result.rows[0].latitude,
         longitude: result.rows[0].longitude,
         delivery_radius_km: result.rows[0].delivery_radius_km,
         status: result.rows[0].status,
       },
-      documents: result.rows.map(row => ({
-        document_id: row.document_id,
-        doc_type: row.doc_type,
-        file_url: row.file_url,
-        uploaded_at: row.uploaded_at
-      }))
+      documents: result.rows[0].farmer_proof_doc_url ? {
+        farm_image_url: result.rows[0].farm_image_url,
+        farmer_image_url: result.rows[0].farmer_image_url,
+        farmer_proof_doc_url: result.rows[0].farmer_proof_doc_url,
+        is_doc_verified: result.rows[0].is_doc_verified,
+        doc_created_at: result.rows[0].doc_created_at
+      } : null
     };
 
     res.status(200).json({
@@ -164,9 +188,11 @@ export const approveFarmer = async (req, res) => {
     if (farmer.rows.length === 0)
       return res.status(404).json({ success: false, message: "Farmer not found" });
 
-    await pool.query("update users set status = $1 where id=$2", ["active", id]);
-    await pool.query("UPDATE farmer_profiles SET status='approved' WHERE user_id=$1", [id]);
-    await pool.query("update documents set is_verified = $1 where farmer_id=$2", [true, id]);
+    const farmerProfileId = farmer.rows[0].id; // This is the farmer_profiles.id
+
+    await pool.query("UPDATE users SET status = $1 WHERE id = $2", ["active", id]);
+    await pool.query("UPDATE farmer_profiles SET status = 'approved' WHERE user_id = $1", [id]);
+    await pool.query("UPDATE farmer_docs SET is_doc_verified = $1 WHERE farmer_id = $2", [true, farmerProfileId]);
 
     await logAdminAction(adminId, id, "APPROVE");
 

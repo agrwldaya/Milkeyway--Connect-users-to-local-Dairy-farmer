@@ -145,12 +145,10 @@ export const uploadDocuments = async (req, res) => {
   try {
     const { user_id } = req.params;
 
-    
-   //console.log(req.files);
-
     if (!user_id) {
       return res.status(400).json({ success: false, message: "User ID is required" });
     }
+    
     // Check if farmer exists
     const user = await pool.query("SELECT * FROM users WHERE id = $1 AND role = $2", [user_id, "farmer"]);
     if (user.rows.length === 0) {
@@ -164,35 +162,71 @@ export const uploadDocuments = async (req, res) => {
     const farmer_id = farmer.rows[0].id;
 
     // Check if files exist
-    if (!req.files || !req.files.farmer_doc) {
+    if (!req.files) {
       return res.status(400).json({ success: false, message: "No documents uploaded" });
     }
 
-    // Upload files to Cloudinary
-    const { uploadedUrls, errors } = await uploadFiles(req.files,"farmer_doc" );
-    console.log("Uploaded URLs:", uploadedUrls);
+    const { farm_image, farmer_image, farmer_proof_doc } = req.files;
+    
+    // At least farmer_proof_doc is required
+    if (!farmer_proof_doc) {
+      return res.status(400).json({ success: false, message: "Farmer proof document is required" });
+    }
 
-    let doc_type = 'unknown'; 
-    // Save file URLs into farmer_documents table
-    if (uploadedUrls.length > 0) {
-       doc_type = uploadedUrls.length > 0 ? uploadedUrls[0].split('.').pop() :'unknown';
+    let farm_image_url = null;
+    let farmer_image_url = null;
+    let farmer_proof_doc_url = null;
 
-      const insertQuery = `
-        INSERT INTO documents (farmer_id, file_url, uploaded_at, doc_type)
-        VALUES ($1, $2, NOW(), $3)
-        RETURNING *;
-      `;
-
-      for (const url of uploadedUrls) {
-        await pool.query(insertQuery, [farmer_id, url,  doc_type]);
+    // Upload farm image if provided
+    if (farm_image) {
+      const { uploadedUrls } = await uploadFiles({ farmer_doc: farm_image }, "farmer_doc");
+      if (uploadedUrls.length > 0) {
+        farm_image_url = uploadedUrls[0];
       }
+    }
+
+    // Upload farmer image if provided
+    if (farmer_image) {
+      const { uploadedUrls } = await uploadFiles({ farmer_doc: farmer_image }, "farmer_doc");
+      if (uploadedUrls.length > 0) {
+        farmer_image_url = uploadedUrls[0];
+      }
+    }
+
+    // Upload farmer proof document (required)
+    const { uploadedUrls } = await uploadFiles({ farmer_doc: farmer_proof_doc }, "farmer_doc");
+    if (uploadedUrls.length > 0) {
+      farmer_proof_doc_url = uploadedUrls[0];
+    }
+
+    // Check if farmer_docs record already exists
+    const existingDocs = await pool.query("SELECT * FROM farmer_docs WHERE farmer_id = $1", [farmer_id]);
+    
+    if (existingDocs.rows.length > 0) {
+      // Update existing record
+      await pool.query(
+        `UPDATE farmer_docs 
+         SET farm_image_url=$1, farmer_image_url=$2, farmer_proof_doc_url=$3, updated_at=NOW()
+         WHERE farmer_id=$4`,
+        [farm_image_url, farmer_image_url, farmer_proof_doc_url, farmer_id]
+      );
+    } else {
+      // Insert new record
+      await pool.query(
+        `INSERT INTO farmer_docs (farmer_id, farm_image_url, farmer_image_url, farmer_proof_doc_url)
+         VALUES ($1, $2, $3, $4)`,
+        [farmer_id, farm_image_url, farmer_image_url, farmer_proof_doc_url]
+      );
     }
 
     return res.status(200).json({
       success: true,
-      message: "Documents processed",
-      uploaded: uploadedUrls,
-      doc_type
+      message: "Documents uploaded successfully",
+      uploaded: {
+        farm_image_url,
+        farmer_image_url,
+        farmer_proof_doc_url
+      }
     });
   } catch (error) {
     console.error("Upload Documents Error:", error);
@@ -282,23 +316,28 @@ export const getFarmerProfile = async (req, res) => {
     if (user.rows.length === 0) {
       return res.status(404).json({ message: "Farmer not found" });
     }
-    const farmInfo = await pool.query("select * from farmer_profiles where user_id=$1",[user.id]);
+    const farmInfo = await pool.query("select * from farmer_profiles where user_id=$1",[user_id]);
     if (farmInfo.rows.length === 0) {
       return res.status(404).json({ message: "Farmer profile not found" });
     }
-    const documents = await pool.query("select * from documents where farmer_id =$1",[farmInfo.id]);
+    const documents = await pool.query("select * from farmer_docs where farmer_id =$1",[farmInfo.rows[0].id]);
 
-    
     const farmerProfile = {
-      name :user.name,
-      email:user.email,
-      phone:user.phone,
-      farmName:farmInfo.farm_name,
-      address:farmInfo.address,
-      deliveryRadius:farmInfo.delivery_radius_km,
-      cordinates:{latitude:farmInfo.latitude,longitude:farmInfo.longitude},
-      farmerStatus:farmInfo.status,
-      createdAt:farmInfo.createdAt,
+      name: user.rows[0].name,
+      email: user.rows[0].email,
+      phone: user.rows[0].phone,
+      farmName: farmInfo.rows[0].farm_name,
+      address: farmInfo.rows[0].address,
+      deliveryRadius: farmInfo.rows[0].delivery_radius_km,
+      coordinates: {latitude: farmInfo.rows[0].latitude, longitude: farmInfo.rows[0].longitude},
+      farmerStatus: farmInfo.rows[0].status,
+      createdAt: farmInfo.rows[0].created_at,
+      documents: documents.rows.length > 0 ? {
+        farm_image_url: documents.rows[0].farm_image_url,
+        farmer_image_url: documents.rows[0].farmer_image_url,
+        farmer_proof_doc_url: documents.rows[0].farmer_proof_doc_url,
+        is_doc_verified: documents.rows[0].is_doc_verified
+      } : null
     }
     res.status(200).json({ message: "Farmer profile fetched successfully", farmerProfile });
   } catch (error) {
@@ -306,3 +345,233 @@ export const getFarmerProfile = async (req, res) => {
     res.status(500).json({ message: "Internal server error" });
   }
 };
+
+export const showcategories = async (req, res) => {
+  try {
+    // Fetch both category lists
+    const categoriesResult = await pool.query("SELECT * FROM categories ORDER BY id ASC");
+    const milkCategoriesResult = await pool.query("SELECT * FROM milk_categories ORDER BY id ASC");
+
+    // Send the clean data only (not query metadata)
+    res.status(200).json({
+      success: true,
+      message: "Available product categories fetched successfully",
+      categories: categoriesResult.rows,
+      milkCategories: milkCategoriesResult.rows,
+    });
+
+  } catch (error) {
+    console.error("Get showing product categories Error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Internal server error while fetching product categories",
+      error: error.message,
+    });
+  }
+};
+
+export const addProducts = async (req, res) => {
+  try {
+    const userId = req.user?.user_id || req.body.userId; // prefer auth middleware
+    const { category_id, milk_category_id } = req.params;
+    const { unit,price_per_unit, description } = req.body;
+
+    if (!category_id || !unit||  !price_per_unit || !description) {
+      return res.status(400).json({ message: "Missing required fields" });
+    }
+    // 1️⃣ Check user
+    const user = await pool.query(
+      "SELECT * FROM users WHERE id = $1 AND role = $2",
+      [userId, "farmer"]
+    );
+    if (user.rows.length === 0) {
+      return res.status(404).json({ message: "Farmer not found" });
+    }
+    // 2️⃣ Check farmer profile
+    const farmer = await pool.query(
+      "SELECT * FROM farmer_profiles WHERE user_id = $1",
+      [userId]
+    );
+    if (farmer.rows.length === 0) {
+      return res.status(404).json({ message: "Farmer profile not found" });
+    }
+    // 3️⃣ Get category name
+    const categoryRes = await pool.query(
+      "SELECT * FROM categories WHERE id = $1",
+      [category_id]
+    );
+    if (categoryRes.rows.length === 0) {
+      return res.status(404).json({ message: "Category not found" });
+    }
+    let productName = categoryRes.rows[0].name;
+
+    // 4️⃣ Handle milk subcategory
+    if (categoryRes.rows[0].name.toLowerCase() === "milk") {
+      if (!milk_category_id) {
+        return res.status(400).json({ message: "Milk type is required" });
+      }
+      const milkCatRes = await pool.query(
+        "SELECT * FROM milk_categories WHERE id = $1",
+        [milk_category_id]
+      );
+      if (milkCatRes.rows.length === 0) {
+        return res.status(404).json({ message: "Milk category not found" });
+      }
+      productName = `${milkCatRes.rows[0].milk_cattle} Milk`;
+    }
+
+    // 5️⃣ Insert product
+    const farmerId = farmer.rows[0].id;
+    await pool.query(
+      `INSERT INTO products 
+        (farmer_id, category_id, name, description, price_per_unit,unit, is_available) 
+       VALUES ($1, $2, $3, $4, $5, $6,$7)`,
+      [farmerId, category_id, productName, description, price_per_unit,unit, true]
+    );
+
+    res.status(201).json({ success: true, message: "Product added successfully!" });
+
+  } catch (error) {
+    console.error("Add Product Error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Internal server error while adding product",
+      error: error.message,
+    });
+  }
+};
+
+export const getFarmerProducts = async (req, res) => {
+  try {
+    const userId = req.user?.user_id || req.body.userId; // prefer auth middleware
+
+    // 1️⃣ Verify user role
+    const user = await pool.query(
+      "SELECT * FROM users WHERE id = $1 AND role = $2",
+      [userId, "farmer"]
+    );
+
+    if (user.rows.length === 0) {
+      return res.status(404).json({ message: "Farmer not found" });
+    }
+
+    // 2️⃣ Get farmer profile
+    const farmerProfile = await pool.query(
+      "SELECT * FROM farmer_profiles WHERE user_id = $1",
+      [userId]
+    );
+
+    if (farmerProfile.rows.length === 0) {
+      return res.status(404).json({ message: "Farmer profile not found" });
+    }
+
+    const farmerId = farmerProfile.rows[0].id;
+
+    // 3️⃣ Get all products of this farmer
+    const products = await pool.query(
+      `
+        SELECT 
+          p.id,
+          p.name,
+          p.description,
+          p.price_per_unit,
+          p.unit,
+          p.is_available,
+          p.created_at,
+          c.name AS category_name,
+          c.imageurl AS image_url,
+          mc.milk_cattle AS milk_type
+        FROM products p
+        JOIN categories c ON p.category_id = c.id
+        LEFT JOIN milk_categories mc ON p.name ILIKE CONCAT('%', mc.milk_cattle, '%')
+        WHERE p.farmer_id = $1
+        ORDER BY p.created_at DESC
+      `,
+      [farmerId]
+    );
+
+    if (products.rows.length === 0) {
+      return res.status(200).json({
+        success: true,
+        message: "No products added yet.",
+        products: [],
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Farmer products fetched successfully",
+      products: products.rows,
+    });
+
+  } catch (error) {
+    console.error("Get Farmer Products Error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Internal server error while fetching products",
+      error: error.message,
+    });
+  }
+};
+
+export const updateProducts = async (req, res) => {
+  try {
+    const userId = req.user?.user_id || req.body.userId; // prefer auth middleware
+    const { product_id } = req.params;
+    const { unit, price_per_unit, description, is_available } = req.body;
+
+    if (!product_id || !unit || !price_per_unit || !description) {
+      return res.status(400).json({ message: "Missing required fields" });
+    }
+
+    // 1️⃣ Check user
+    const user = await pool.query(
+      "SELECT * FROM users WHERE id = $1 AND role = $2",
+      [userId, "farmer"]
+    );
+    if (user.rows.length === 0) {
+      return res.status(404).json({ message: "Farmer not found" });
+    }
+
+    // 2️⃣ Check farmer profile
+    const farmer = await pool.query(
+      "SELECT * FROM farmer_profiles WHERE user_id = $1",
+      [userId]
+    );
+    if (farmer.rows.length === 0) {
+      return res.status(404).json({ message: "Farmer profile not found" });
+    }
+
+    const farmerId = farmer.rows[0].id;
+
+    // 3️⃣ Check if product belongs to this farmer
+    const productCheck = await pool.query(
+      "SELECT * FROM products WHERE id = $1 AND farmer_id = $2",
+      [product_id, farmerId]
+    );
+    if (productCheck.rows.length === 0) {
+      return res.status(404).json({ message: "Product not found or access denied" });
+    }
+
+    // 4️⃣ Update product
+    await pool.query(
+      `UPDATE products 
+       SET unit=$1, price_per_unit=$2, description=$3, is_available=$4, updated_at=NOW()
+       WHERE id=$5 AND farmer_id=$6`,
+      [unit, price_per_unit, description, is_available !== undefined ? is_available : true, product_id, farmerId]
+    );
+
+    res.status(200).json({ success: true, message: "Product updated successfully!" });
+
+  } catch (error) {
+    console.error("Update Product Error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Internal server error while updating product",
+      error: error.message,
+    });
+  }
+};
+
+
+

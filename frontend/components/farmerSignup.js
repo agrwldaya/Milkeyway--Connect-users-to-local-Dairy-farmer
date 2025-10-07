@@ -124,22 +124,32 @@ export default function FarmerSignup({ formData, setFormData, step, setStep, onB
   }
 
   const handleUploadDocs = async () => {
-    if (!formData.documents) {
-      // optional, allow skip
-      router.push("/farmer/dashboard")
+    if (!formData.farmer_proof_doc) {
+      toast.error("Farmer proof document is required")
       return
     }
     setIsSubmitting(true)
     try {
       const form = new FormData()
-      form.append("farmer_doc", formData.documents)
+      
+      // Add required farmer proof document
+      form.append("farmer_proof_doc", formData.farmer_proof_doc)
+      
+      // Add optional documents if provided
+      if (formData.farm_image) {
+        form.append("farm_image", formData.farm_image)
+      }
+      if (formData.farmer_image) {
+        form.append("farmer_image", formData.farmer_image)
+      }
+      
       const res = await fetch(`${API_BASE}/api/v1/farmers/upload-docs/${userId}`, {
         method: "POST",
         credentials: "include",
         body: form,
       })
       const data = await res.json()
-        if (!res.ok){
+      if (!res.ok){
         toast.error(data?.message || "Document upload failed")
         return
       }
@@ -240,14 +250,52 @@ export default function FarmerSignup({ formData, setFormData, step, setStep, onB
 
   return (
     <div className="space-y-4">
-      <div className="space-y-2">
-        <Label htmlFor="documents">Upload Documents (Optional)</Label>
-        <div className="border-2 border-dashed rounded-lg p-6 text-center hover:border-[#80e619] transition-colors cursor-pointer">
-          <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
-          <p className="text-sm text-muted-foreground">Click to upload farm license or certification</p>
-          <Input id="documents" type="file" className="hidden" onChange={(e) => setFormData({ ...formData, documents: e.target.files?.[0] || null })} />
+      <div className="space-y-4">
+        <div className="space-y-2">
+          <Label htmlFor="farmer_proof_doc">Farmer Proof Document *</Label>
+          <div className="border-2 border-dashed rounded-lg p-6 text-center hover:border-[#80e619] transition-colors cursor-pointer">
+            <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+            <p className="text-sm text-muted-foreground">Click to upload ID proof, license, or certification</p>
+            <Input 
+              id="farmer_proof_doc" 
+              type="file" 
+              className="hidden" 
+              onChange={(e) => setFormData({ ...formData, farmer_proof_doc: e.target.files?.[0] || null })} 
+            />
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="farm_image">Farm Image (Optional)</Label>
+          <div className="border-2 border-dashed rounded-lg p-6 text-center hover:border-[#80e619] transition-colors cursor-pointer">
+            <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+            <p className="text-sm text-muted-foreground">Click to upload farm photo</p>
+            <Input 
+              id="farm_image" 
+              type="file" 
+              accept="image/*"
+              className="hidden" 
+              onChange={(e) => setFormData({ ...formData, farm_image: e.target.files?.[0] || null })} 
+            />
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="farmer_image">Farmer Photo (Optional)</Label>
+          <div className="border-2 border-dashed rounded-lg p-6 text-center hover:border-[#80e619] transition-colors cursor-pointer">
+            <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+            <p className="text-sm text-muted-foreground">Click to upload your photo</p>
+            <Input 
+              id="farmer_image" 
+              type="file" 
+              accept="image/*"
+              className="hidden" 
+              onChange={(e) => setFormData({ ...formData, farmer_image: e.target.files?.[0] || null })} 
+            />
+          </div>
         </div>
       </div>
+      
       <div className="flex gap-3">
         <Button type="button" variant="outline" onClick={() => setSubStep("farm")} className="flex-1">Back</Button>
         <Button onClick={handleUploadDocs} className="flex-1 bg-[#80e619] hover:bg-[#80e619]/90" disabled={isSubmitting}>{isSubmitting ? "Uploading..." : "Finish"}</Button>

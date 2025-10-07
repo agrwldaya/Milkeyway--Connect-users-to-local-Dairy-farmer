@@ -1,24 +1,57 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
-import { Upload, X, Camera, Award, MapPin, Phone, Mail } from "lucide-react"
+import { Upload, X, Camera, Award, MapPin, Phone, Mail, CheckCircle, AlertCircle } from "lucide-react"
 import { FarmerNav } from "@/components/farmer-nav"
+import { api } from "@/lib/utils"
+import { toast } from "sonner"
 
 
 export default function ProfilePage() {
-  const [coverImage, setCoverImage] = useState("/dairy-farm-landscape.jpg")
-  const [profileImage, setProfileImage] = useState("/farmer-portrait.png")
-  const [farmImages, setFarmImages] = useState([
-    "/dairy-cows-grazing.jpg",
-    "/milk-collection.jpg",
-    "/vintage-farm-equipment.png",
-  ])
+  const API_BASE = process.env.NEXT_PUBLIC_API_URL || ""
+  const [isLoading, setIsLoading] = useState(false)
+  const [farmerProfile, setFarmerProfile] = useState(null)
+  const [coverImage, setCoverImage] = useState("/farm_cover.jpg")
+  const [profileImage, setProfileImage] = useState("/farmer_image.jpg")
+  const [farmImages, setFarmImages] = useState([])
+
+  useEffect(() => {
+    let active = true
+    const fetchProfile = async () => {
+      setIsLoading(true)
+      try {
+        const res = await api.get(`${API_BASE}/api/v1/farmers/profile`)
+        const data = res.data
+        if (!data?.farmerProfile) throw new Error(data?.message || "Failed to load profile")
+        if (!active) return
+        setFarmerProfile(data.farmerProfile)
+        
+        // Set images from profile data
+        if (data.farmerProfile.documents) {
+          if (data.farmerProfile.documents.farm_image_url) {
+            setCoverImage(data.farmerProfile.documents.farm_image_url)
+          }
+          if (data.farmerProfile.documents.farmer_image_url) {
+            setProfileImage(data.farmerProfile.documents.farmer_image_url)
+          }
+        }
+      } catch (err) {
+        toast.error(err?.response?.data?.message || err.message || "Failed to load profile")
+      } finally {
+        setIsLoading(false)
+      }
+    }
+    fetchProfile()
+    return () => {
+      active = false
+    }
+  }, [API_BASE])
 
   const handleCoverUpload = (e) => {
     const file = e.target.files?.[0]
@@ -46,6 +79,35 @@ export default function ProfilePage() {
     setFarmImages(farmImages.filter((_, i) => i !== index))
   }
 
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background">
+        <FarmerNav />
+        <main className="container py-8 px-5">
+          <div className="flex items-center justify-center h-64">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+              <p className="text-muted-foreground">Loading profile...</p>
+            </div>
+          </div>
+        </main>
+      </div>
+    )
+  }
+
+  if (!farmerProfile) {
+    return (
+      <div className="min-h-screen bg-background">
+        <FarmerNav />
+        <main className="container py-8 px-5">
+          <div className="text-center">
+            <p className="text-muted-foreground">Failed to load profile data</p>
+          </div>
+        </main>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-background">
       <FarmerNav />
@@ -61,7 +123,7 @@ export default function ProfilePage() {
           <Card>
             <CardContent className="p-0">
               <div className="relative h-48 md:h-64 bg-muted">
-                <img src={'/farm_cover.jpg'} alt="Farm cover" className="w-full h-full object-cover" />
+                <img src={coverImage} alt="Farm cover" className="w-full h-full object-cover" />
                 <label className="absolute bottom-4 right-4 cursor-pointer">
                   <Button type="button" size="sm" className="pointer-events-none">
                     <Camera className="h-4 w-4 mr-2" />
@@ -75,7 +137,7 @@ export default function ProfilePage() {
                   <div className="relative">
                     <div className="h-32 w-32 rounded-full border-4 border-background overflow-hidden bg-muted">
                       <img
-                        src={"/farmer_image.jpg"}
+                        src={profileImage}
                         alt="Profile"
                         className="w-full h-full object-cover"
                       />
@@ -90,10 +152,25 @@ export default function ProfilePage() {
                   <div className="flex-1 mt-16 md:mt-20">
                     <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                       <div>
-                        <h2 className="text-2xl font-bold">Ramesh Dairy Farm</h2>
-                        <p className="text-muted-foreground">Member since January 2024</p>
+                        <h2 className="text-2xl font-bold">{farmerProfile.farmName}</h2>
+                        <p className="text-muted-foreground">Member since {new Date(farmerProfile.createdAt).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</p>
                       </div>
-                      <Badge className="w-fit">Verified Farmer</Badge>
+                      <div className="flex gap-2">
+                        <Badge variant={farmerProfile.farmerStatus === "active" ? "default" : "secondary"}>
+                          {farmerProfile.farmerStatus}
+                        </Badge>
+                        {farmerProfile.documents?.is_doc_verified ? (
+                          <Badge variant="default" className="bg-green-600">
+                            <CheckCircle className="h-3 w-3 mr-1" />
+                            Verified
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="border-yellow-500 text-yellow-600">
+                            <AlertCircle className="h-3 w-3 mr-1" />
+                            Pending Verification
+                          </Badge>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -110,12 +187,12 @@ export default function ProfilePage() {
             <CardContent className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="farmName">Farm Name *</Label>
-                <Input id="farmName" defaultValue="Ramesh Dairy Farm" />
+                <Input id="farmName" value={farmerProfile.farmName} readOnly />
               </div>
 
               <div className="space-y-2">
                 <Label htmlFor="ownerName">Owner Name *</Label>
-                <Input id="ownerName" defaultValue="Ramesh Kumar Patel" />
+                <Input id="ownerName" value={farmerProfile.name} readOnly />
               </div>
 
               <div className="grid gap-4 md:grid-cols-2">
@@ -123,7 +200,7 @@ export default function ProfilePage() {
                   <Label htmlFor="phone">Phone Number *</Label>
                   <div className="relative">
                     <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input id="phone" defaultValue="+91 98765 43210" className="pl-10" />
+                    <Input id="phone" value={farmerProfile.phone} className="pl-10" readOnly />
                   </div>
                 </div>
 
@@ -131,7 +208,7 @@ export default function ProfilePage() {
                   <Label htmlFor="email">Email Address</Label>
                   <div className="relative">
                     <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input id="email" type="email" defaultValue="ramesh@example.com" className="pl-10" />
+                    <Input id="email" type="email" value={farmerProfile.email} className="pl-10" readOnly />
                   </div>
                 </div>
               </div>
@@ -142,9 +219,25 @@ export default function ProfilePage() {
                   <MapPin className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                   <Textarea
                     id="address"
-                    defaultValue="Village Khandala, Taluka Maval, District Pune, Maharashtra - 410301"
+                    value={farmerProfile.address}
                     className="pl-10"
                     rows={3}
+                    readOnly
+                  />
+                </div>
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="deliveryRadius">Delivery Radius (km)</Label>
+                  <Input id="deliveryRadius" value={farmerProfile.deliveryRadius} readOnly />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="coordinates">Coordinates</Label>
+                  <Input 
+                    id="coordinates" 
+                    value={`${farmerProfile.coordinates.latitude}, ${farmerProfile.coordinates.longitude}`} 
+                    readOnly 
                   />
                 </div>
               </div>
@@ -198,39 +291,51 @@ export default function ProfilePage() {
             </CardContent>
           </Card>
 
-          {/* Certifications */}
+          {/* Documents */}
           <Card>
             <CardHeader>
-              <CardTitle>Certifications & Awards</CardTitle>
-              <CardDescription>Add your certifications and recognitions</CardDescription>
+              <CardTitle>Documents & Verification</CardTitle>
+              <CardDescription>Your uploaded documents and verification status</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="space-y-3">
-                <div className="flex items-center gap-3 p-3 border rounded-lg">
-                  <Award className="h-5 w-5 text-primary" />
-                  <div className="flex-1">
-                    <p className="font-medium">FSSAI License</p>
-                    <p className="text-sm text-muted-foreground">License No: 12345678901234</p>
-                  </div>
-                  <Button variant="ghost" size="sm">
-                    <X className="h-4 w-4" />
-                  </Button>
+              {farmerProfile.documents ? (
+                <div className="space-y-3">
+                  {farmerProfile.documents.farmer_proof_doc_url && (
+                    <div className="flex items-center gap-3 p-3 border rounded-lg">
+                      <Award className="h-5 w-5 text-primary" />
+                      <div className="flex-1">
+                        <p className="font-medium">Farmer Proof Document</p>
+                        <p className="text-sm text-muted-foreground">ID proof, license, or certification</p>
+                      </div>
+                      <Badge variant={farmerProfile.documents.is_doc_verified ? "default" : "secondary"}>
+                        {farmerProfile.documents.is_doc_verified ? "Verified" : "Pending"}
+                      </Badge>
+                    </div>
+                  )}
+                  {farmerProfile.documents.farm_image_url && (
+                    <div className="flex items-center gap-3 p-3 border rounded-lg">
+                      <Camera className="h-5 w-5 text-primary" />
+                      <div className="flex-1">
+                        <p className="font-medium">Farm Image</p>
+                        <p className="text-sm text-muted-foreground">Farm photo uploaded</p>
+                      </div>
+                    </div>
+                  )}
+                  {farmerProfile.documents.farmer_image_url && (
+                    <div className="flex items-center gap-3 p-3 border rounded-lg">
+                      <Camera className="h-5 w-5 text-primary" />
+                      <div className="flex-1">
+                        <p className="font-medium">Farmer Photo</p>
+                        <p className="text-sm text-muted-foreground">Your photo uploaded</p>
+                      </div>
+                    </div>
+                  )}
                 </div>
-                <div className="flex items-center gap-3 p-3 border rounded-lg">
-                  <Award className="h-5 w-5 text-primary" />
-                  <div className="flex-1">
-                    <p className="font-medium">Organic Certification</p>
-                    <p className="text-sm text-muted-foreground">Certified by NPOP</p>
-                  </div>
-                  <Button variant="ghost" size="sm">
-                    <X className="h-4 w-4" />
-                  </Button>
+              ) : (
+                <div className="text-center py-8">
+                  <p className="text-muted-foreground">No documents uploaded yet</p>
                 </div>
-              </div>
-              <Button type="button" variant="outline" className="w-full bg-transparent">
-                <Upload className="h-4 w-4 mr-2" />
-                Add Certification
-              </Button>
+              )}
             </CardContent>
           </Card>
 
@@ -271,13 +376,13 @@ export default function ProfilePage() {
             </CardContent>
           </Card>
 
-          {/* Submit Buttons */}
+          {/* Action Buttons */}
           <div className="flex flex-col sm:flex-row gap-4 justify-end">
             <Button type="button" variant="outline" className="w-full sm:w-auto bg-transparent">
-              Cancel
+              Edit Profile
             </Button>
-            <Button type="submit" className="bg-primary hover:bg-primary/90 w-full sm:w-auto">
-              Save Changes
+            <Button type="button" className="bg-primary hover:bg-primary/90 w-full sm:w-auto">
+              Update Documents
             </Button>
           </div>
         </form>

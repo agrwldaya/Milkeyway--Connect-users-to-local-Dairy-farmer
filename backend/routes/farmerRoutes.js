@@ -4,8 +4,14 @@ import {
   completeFarmerProfile,
   uploadDocuments,
   loginFarmer,
+  addProducts,
+  getFarmerProducts,
+  updateProducts,
+  showcategories,
+  getFarmerProfile,
 } from "../controllers/farmerController.js";
 import { verifyOtp } from "../controllers/autocontroller.js";
+import { authMiddleware } from "../middleware/authMiddleWare.js";
 
 const farmerRouter = express.Router();
 
@@ -21,19 +27,16 @@ farmerRouter.post("/profile/:user_id", completeFarmerProfile);
 // STEP 4 - Upload documents (variation docs, ID proof, etc.)
 farmerRouter.post("/upload-docs/:user_id", uploadDocuments);
 
-// // GET - Get single farmer by id
-// farmerRouter.get("/:farmerId", getFarmerById);
+farmerRouter.post("/addproducts/:category_id/:milk_category_id", authMiddleware , addProducts);
 
-// // PUT - Update farmer info
-// farmerRouter.put("/:farmerId", updateFarmer);
+farmerRouter.get("/products", authMiddleware, getFarmerProducts);
 
-// // GET - Get all farmers (admin use case)
-// farmerRouter.get("/", getAllFarmers);
+farmerRouter.put("/products/:product_id", authMiddleware, updateProducts);
 
-// // DELETE - Delete farmer (admin use case)
-// farmerRouter.delete("/:farmerId", deleteFarmer);
-
+farmerRouter.get("/showcategories", showcategories);
 // login farmer
 farmerRouter.post("/login", loginFarmer);
+
+farmerRouter.get("/profile", authMiddleware, getFarmerProfile)
 
 export default farmerRouter;

@@ -2,20 +2,19 @@ import jwt from "jsonwebtoken";
 
 export const authMiddleware = (req, res, next) => {
   try {
-    
     const authHeader = req.headers.authorization || req.headers.token;
+    const cookieToken = req.cookies?.token; // support httpOnly cookie token
 
-    if (!authHeader) {
+    if (!authHeader && !cookieToken) {
       return res.status(401).json({
         success: false,
         message: "Authorization token missing",
       });
     }
 
-   
-    const token = authHeader.startsWith("Bearer ")
-      ? authHeader.split(" ")[1]
-      : authHeader;
+    const token = authHeader
+      ? (authHeader.startsWith("Bearer ") ? authHeader.split(" ")[1] : authHeader)
+      : cookieToken;
 
     if (!token) {
       return res.status(401).json({

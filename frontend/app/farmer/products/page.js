@@ -1,3 +1,6 @@
+"use client"
+
+import { useEffect, useState } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -7,76 +10,111 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Plus, Search, Edit, Trash2, Eye, MoreVertical } from "lucide-react"
 import { FarmerNav } from "@/components/farmer-nav"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
+import { api } from "@/lib/utils"
+import { toast } from "sonner"
 
 export default function ProductsPage() {
-  const products = [
-    {
-      id: 1,
-      name: "Fresh Cow Milk",
-      category: "Milk",
-      price: "₹60/L",
-      stock: 50,
-      unit: "Liters",
-      status: "active",
-      image: "/fresh-milk-bottle.jpg",
-      description: "Pure A2 cow milk from grass-fed cows",
-    },
-    {
-      id: 2,
-      name: "Pure Desi Ghee",
-      category: "Ghee",
-      price: "₹550/kg",
-      stock: 8,
-      unit: "Kg",
-      status: "active",
-      image: "/ghee.jpg",
-      description: "Traditional bilona method ghee",
-    },
-    {
-      id: 3,
-      name: "Homemade Paneer",
-      category: "Paneer",
-      price: "₹350/kg",
-      stock: 15,
-      unit: "Kg",
-      status: "active",
-      image: "/paneer.jpg",
-      description: "Fresh cottage cheese made daily",
-    },
-    {
-      id: 4,
-      name: "Thick Curd",
-      category: "Curd",
-      price: "₹70/kg",
-      stock: 0,
-      unit: "Kg",
-      status: "inactive",
-      image: "/thick-curd-bowl.jpg",
-      description: "Creamy homemade curd",
-    },
-    {
-      id: 5,
-      name: "Fresh Butter",
-      category: "Butter",
-      price: "₹450/kg",
-      stock: 12,
-      unit: "Kg",
-      status: "active",
-      image: "/butter-block.jpg",
-      description: "Unsalted fresh butter",
-    },
-    {
-      id: 6,
-      name: "Buffalo Milk",
-      category: "Milk",
-      price: "₹75/L",
-      stock: 30,
-      unit: "Liters",
-      status: "active",
-      image: "/buffalo-milk.jpg",
-      description: "Rich and creamy buffalo milk",
-    },
-  ]
+  const API_BASE = process.env.NEXT_PUBLIC_API_URL || ""
+  const [isLoading, setIsLoading] = useState(false)
+  const [products, setProducts] = useState([])
+  const [isUpdateDialogOpen, setIsUpdateDialogOpen] = useState(false)
+  const [editingProduct, setEditingProduct] = useState(null)
+  const [updateForm, setUpdateForm] = useState({
+    unit: "",
+    price_per_unit: "",
+    description: "",
+    is_available: true
+  })
+
+  useEffect(() => {
+    let active = true
+    const fetchProducts = async () => {
+      setIsLoading(true)
+      try {
+        const res = await api.get(`${API_BASE}/api/v1/farmers/products`)
+        const data = res.data
+        if (!data?.success) throw new Error(data?.message || "Failed to load products")
+        if (!active) return
+        // Map API fields to UI
+        const mapped = (data.products || []).map((p) => ({
+          id: p.id,
+          name: p.name,
+          description: p.description,
+          price: `₹${p.price_per_unit}`,
+          status: p.is_available ? "active" : "inactive",
+          category: p.category_name,
+          image: p.image_url || "/placeholder.svg",
+          unit: p.unit || "",
+        }))
+        setProducts(mapped)
+      } catch (err) {
+        toast.error(err?.response?.data?.message || err.message || "Failed to load products")
+      } finally {
+        setIsLoading(false)
+      }
+    }
+    fetchProducts()
+    return () => {
+      active = false
+    }
+  }, [API_BASE])
+
+  const handleEditProduct = (product) => {
+    setEditingProduct(product)
+    setUpdateForm({
+      unit: product.unit || "",
+      price_per_unit: product.price?.replace("₹", "") || "",
+      description: product.description || "",
+      is_available: product.status === "active"
+    })
+    setIsUpdateDialogOpen(true)
+  }
+
+  const handleUpdateProduct = async () => {
+    if (!editingProduct || !updateForm.unit || !updateForm.price_per_unit || !updateForm.description) {
+      toast.error("Please fill all required fields")
+      return
+    }
+
+    setIsLoading(true)
+    try {
+      await api.put(
+        `${API_BASE}/api/v1/farmers/products/${editingProduct.id}`,
+        {
+          unit: updateForm.unit,
+          price_per_unit: Number(updateForm.price_per_unit),
+          description: updateForm.description,
+          is_available: updateForm.is_available
+        }
+      )
+      toast.success("Product updated successfully")
+      setIsUpdateDialogOpen(false)
+      setEditingProduct(null)
+      // Refresh products list
+      const res = await api.get(`${API_BASE}/api/v1/farmers/products`)
+      const data = res.data
+      if (data?.success) {
+        const mapped = (data.products || []).map((p) => ({
+          id: p.id,
+          name: p.name,
+          description: p.description,
+          price: `₹${p.price_per_unit}`,
+          status: p.is_available ? "active" : "inactive",
+          category: p.category_name,
+          image: p.image_url || "/placeholder.svg",
+          unit: p.unit || "",
+        }))
+        setProducts(mapped)
+      }
+    } catch (err) {
+      toast.error(err?.response?.data?.message || err.message || "Failed to update product")
+    } finally {
+      setIsLoading(false)
+    }
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -150,27 +188,11 @@ export default function ProductsPage() {
                           <Badge variant={product.status === "active" ? "default" : "secondary"}>
                             {product.status}
                           </Badge>
-                          {product.stock < 10 && product.stock > 0 && (
-                            <Badge variant="outline" className="border-secondary text-secondary">
-                              Low Stock
-                            </Badge>
-                          )}
-                          {product.stock === 0 && (
-                            <Badge variant="outline" className="border-destructive text-destructive">
-                              Out of Stock
-                            </Badge>
-                          )}
                         </div>
                         <p className="text-sm text-muted-foreground mb-2">{product.description}</p>
                         <div className="flex flex-wrap gap-4 text-sm">
                           <span className="text-muted-foreground">
                             Category: <span className="text-foreground font-medium">{product.category}</span>
-                          </span>
-                          <span className="text-muted-foreground">
-                            Stock:{" "}
-                            <span className="text-foreground font-medium">
-                              {product.stock} {product.unit}
-                            </span>
                           </span>
                         </div>
                       </div>
@@ -189,7 +211,7 @@ export default function ProductsPage() {
                               <Eye className="h-4 w-4 mr-2" />
                               View Details
                             </DropdownMenuItem>
-                            <DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleEditProduct(product)}>
                               <Edit className="h-4 w-4 mr-2" />
                               Edit Product
                             </DropdownMenuItem>
@@ -207,6 +229,74 @@ export default function ProductsPage() {
             </Card>
           ))}
         </div>
+
+        {/* Update Product Dialog */}
+        <Dialog open={isUpdateDialogOpen} onOpenChange={setIsUpdateDialogOpen}>
+          <DialogContent className="sm:max-w-[425px]">
+            <DialogHeader>
+              <DialogTitle>Edit Product</DialogTitle>
+              <DialogDescription>
+                Update the details for {editingProduct?.name}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+              <div className="grid gap-2">
+                <Label htmlFor="unit">Unit *</Label>
+                <Select value={updateForm.unit} onValueChange={(value) => setUpdateForm({...updateForm, unit: value})}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select unit" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="liter">Liter</SelectItem>
+                    <SelectItem value="kg">Kilogram</SelectItem>
+                    <SelectItem value="gram">Gram</SelectItem>
+                    <SelectItem value="piece">Piece</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="price">Price per Unit (₹) *</Label>
+                <Input
+                  id="price"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  placeholder="0.00"
+                  value={updateForm.price_per_unit}
+                  onChange={(e) => setUpdateForm({...updateForm, price_per_unit: e.target.value})}
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="description">Description *</Label>
+                <Textarea
+                  id="description"
+                  placeholder="Describe your product..."
+                  rows={3}
+                  value={updateForm.description}
+                  onChange={(e) => setUpdateForm({...updateForm, description: e.target.value})}
+                />
+              </div>
+              <div className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  id="is_available"
+                  checked={updateForm.is_available}
+                  onChange={(e) => setUpdateForm({...updateForm, is_available: e.target.checked})}
+                  className="rounded"
+                />
+                <Label htmlFor="is_available">Product is available</Label>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsUpdateDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleUpdateProduct} disabled={isLoading}>
+                {isLoading ? "Updating..." : "Update Product"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </main>
     </div>
   )

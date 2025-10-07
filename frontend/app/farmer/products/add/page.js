@@ -1,29 +1,85 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { ArrowLeft, Upload, X } from "lucide-react"
+import { ArrowLeft } from "lucide-react"
 import { FarmerNav } from "@/components/farmer-nav"
 import Link from "next/link"
+import { api } from "@/lib/utils"
+import { toast } from "sonner"
 
 export default function AddProductPage() {
-  const [images, setImages] = useState([])
+  const router = useRouter()
+  const API_BASE = process.env.NEXT_PUBLIC_API_URL || ""
 
-  const handleImageUpload = (e) => {
-    const files = e.target.files
-    if (files) {
-      const newImages = Array.from(files).map((file) => URL.createObjectURL(file))
-      setImages([...images, ...newImages])
+  const [isLoading, setIsLoading] = useState(false)
+  const [categories, setCategories] = useState([])
+  const [milkCategories, setMilkCategories] = useState([])
+
+  const [selectedCategoryId, setSelectedCategoryId] = useState("")
+  const [selectedMilkCategoryId, setSelectedMilkCategoryId] = useState("")
+  const [unit, setUnit] = useState("")
+  const [pricePerUnit, setPricePerUnit] = useState("")
+  const [description, setDescription] = useState("")
+
+  useEffect(() => {
+    let active = true
+    const fetchCategories = async () => {
+      try {
+        const res = await api.get(`${API_BASE}/api/v1/farmers/showcategories`)
+        const data = res.data
+        if (!data?.success) throw new Error(data?.message || "Failed to load categories")
+        if (!active) return
+        setCategories(data.categories || [])
+        setMilkCategories(data.milkCategories || [])
+      } catch (err) {
+        toast.error(err?.response?.data?.message || err.message || "Failed to load categories")
+      }
     }
-  }
+    fetchCategories()
+    return () => {
+      active = false
+    }
+  }, [API_BASE])
 
-  const removeImage = (index) => {
-    setImages(images.filter((_, i) => i !== index))
+  const selectedCategory = categories.find((c) => String(c.id) === String(selectedCategoryId))
+  const isMilkCategory = selectedCategory?.name?.toLowerCase() === "milk"
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    if (!selectedCategoryId || !unit || !pricePerUnit || !description) {
+      toast.error("Please fill all required fields")
+      return
+    }
+    if (isMilkCategory && !selectedMilkCategoryId) {
+      toast.error("Please select a milk type")
+      return
+    }
+
+    setIsLoading(true)
+    try {
+      const milkId = isMilkCategory ? selectedMilkCategoryId : 0
+      await api.post(
+        `${API_BASE}/api/v1/farmers/addproducts/${selectedCategoryId}/${milkId}`,
+        {
+          unit,
+          price_per_unit: Number(pricePerUnit),
+          description,
+        }
+      )
+      toast.success("Product added successfully")
+      router.push("/farmer/products")
+    } catch (err) {
+      toast.error(err?.response?.data?.message || err.message || "Failed to add product")
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   return (
@@ -39,43 +95,60 @@ export default function AddProductPage() {
             </Button>
           </Link>
           <h1 className="text-4xl font-serif font-bold mb-2">Add New Product</h1>
-          <p className="text-muted-foreground">Fill in the details to list your product</p>
+          <p className="text-muted-foreground">Select a product and provide details</p>
         </div>
 
-        <form className="space-y-6">
-          {/* Basic Information */}
+        <form className="space-y-6" onSubmit={handleSubmit}>
           <Card>
             <CardHeader>
-              <CardTitle>Basic Information</CardTitle>
-              <CardDescription>Enter the basic details of your product</CardDescription>
+              <CardTitle>Product Selection</CardTitle>
+              <CardDescription>Choose category and milk type (if applicable)</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="name">Product Name *</Label>
-                <Input id="name" placeholder="e.g., Fresh Cow Milk" />
-              </div>
-
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
                   <Label htmlFor="category">Category *</Label>
-                  <Select>
+                  <Select value={selectedCategoryId} onValueChange={setSelectedCategoryId}>
                     <SelectTrigger id="category">
                       <SelectValue placeholder="Select category" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="milk">Milk</SelectItem>
-                      <SelectItem value="ghee">Ghee</SelectItem>
-                      <SelectItem value="paneer">Paneer</SelectItem>
-                      <SelectItem value="curd">Curd</SelectItem>
-                      <SelectItem value="butter">Butter</SelectItem>
-                      <SelectItem value="other">Other</SelectItem>
+                      {categories.map((cat) => (
+                        <SelectItem key={cat.id} value={String(cat.id)}>{cat.name}</SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
 
+                {isMilkCategory && (
+                  <div className="space-y-2">
+                    <Label htmlFor="milk">Milk Type *</Label>
+                    <Select value={selectedMilkCategoryId} onValueChange={setSelectedMilkCategoryId}>
+                      <SelectTrigger id="milk">
+                        <SelectValue placeholder="Select milk type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {milkCategories.map((m) => (
+                          <SelectItem key={m.id} value={String(m.id)}>{m.milk_cattle}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Details</CardTitle>
+              <CardDescription>Provide pricing, unit and description</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
                   <Label htmlFor="unit">Unit *</Label>
-                  <Select>
+                  <Select value={unit} onValueChange={setUnit}>
                     <SelectTrigger id="unit">
                       <SelectValue placeholder="Select unit" />
                     </SelectTrigger>
@@ -87,6 +160,19 @@ export default function AddProductPage() {
                     </SelectContent>
                   </Select>
                 </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="price">Price per Unit (₹) *</Label>
+                  <Input
+                    id="price"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    placeholder="0.00"
+                    value={pricePerUnit}
+                    onChange={(e) => setPricePerUnit(e.target.value)}
+                  />
+                </div>
               </div>
 
               <div className="space-y-2">
@@ -95,114 +181,21 @@ export default function AddProductPage() {
                   id="description"
                   placeholder="Describe your product, its quality, and what makes it special..."
                   rows={4}
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
                 />
               </div>
             </CardContent>
           </Card>
 
-          {/* Pricing & Inventory */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Pricing & Inventory</CardTitle>
-              <CardDescription>Set your pricing and stock information</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="price">Price per Unit (₹) *</Label>
-                  <Input id="price" type="number" placeholder="0.00" />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="stock">Available Stock *</Label>
-                  <Input id="stock" type="number" placeholder="0" />
-                </div>
-              </div>
-
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="minOrder">Minimum Order Quantity</Label>
-                  <Input id="minOrder" type="number" placeholder="1" />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="maxOrder">Maximum Order Quantity</Label>
-                  <Input id="maxOrder" type="number" placeholder="100" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Product Images */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Product Images</CardTitle>
-              <CardDescription>Upload clear images of your product (Max 5 images)</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-                {images.map((image, index) => (
-                  <div key={index} className="relative aspect-square rounded-lg overflow-hidden border">
-                    <img
-                      src={image || "/placeholder.svg"}
-                      alt={`Product ${index + 1}`}
-                      className="w-full h-full object-cover"
-                    />
-                    <Button
-                      type="button"
-                      variant="destructive"
-                      size="sm"
-                      className="absolute top-2 right-2 h-6 w-6 p-0"
-                      onClick={() => removeImage(index)}
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
-                  </div>
-                ))}
-                {images.length < 5 && (
-                  <label className="aspect-square rounded-lg border-2 border-dashed border-muted-foreground/25 hover:border-muted-foreground/50 transition-colors cursor-pointer flex flex-col items-center justify-center gap-2">
-                    <Upload className="h-8 w-8 text-muted-foreground" />
-                    <span className="text-xs text-muted-foreground text-center px-2">Upload Image</span>
-                    <input type="file" className="hidden" accept="image/*" onChange={handleImageUpload} multiple />
-                  </label>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Additional Details */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Additional Details</CardTitle>
-              <CardDescription>Optional information about your product</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="certifications">Certifications (if any)</Label>
-                <Input id="certifications" placeholder="e.g., Organic, FSSAI certified" />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="shelfLife">Shelf Life</Label>
-                <Input id="shelfLife" placeholder="e.g., 2 days, 1 week" />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="storage">Storage Instructions</Label>
-                <Textarea id="storage" placeholder="How should customers store this product?" rows={3} />
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Submit Buttons */}
           <div className="flex flex-col sm:flex-row gap-4 justify-end">
             <Link href="/farmer/products">
               <Button type="button" variant="outline" className="w-full sm:w-auto bg-transparent">
                 Cancel
               </Button>
             </Link>
-            <Button type="submit" className="bg-primary hover:bg-primary/90 w-full sm:w-auto">
-              Add Product
+            <Button type="submit" className="bg-primary hover:bg-primary/90 w-full sm:w-auto" disabled={isLoading}>
+              {isLoading ? "Adding..." : "Add Product"}
             </Button>
           </div>
         </form>
