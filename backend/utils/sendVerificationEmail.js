@@ -17,3 +17,20 @@ export const sendVerificationEmail = async (email, otp) => {
     throw error;
   }
 };
+export const sendForgotPasswordEmail = async (email, newPassword) => {
+  try {
+    const html = `
+      <h2>Forgot Password</h2>
+      <p>Here is the new password:</p>
+      <h1>${newPassword}</h1>
+      <p>Please use this password to login.</p>
+      <p> further you can change your password from the settings.</p>
+    `;
+
+    await mailSender(email, "Forgot Password Email - Milkeyway", html);
+    console.log(`✅ New password sent to ${email}`);
+  } catch (error) {
+    console.error("Error occurred while sending forgot password email:", error);
+    throw error;
+  }
+};

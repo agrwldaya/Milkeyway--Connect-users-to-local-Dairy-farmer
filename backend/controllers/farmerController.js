@@ -199,11 +199,11 @@ export const uploadDocuments = async (req, res) => {
     res.status(500).json({ success: false, message: "Internal server error" });
   }
 };
-
 // Farmer Login
 export const loginFarmer = async (req, res) => {
   try {
     const { email, password } = req.body;
+    console.log(email, password);
 
     if (!email || !password) {
       return res.status(400).json({ message: "Email and password are required" });
@@ -245,7 +245,7 @@ export const loginFarmer = async (req, res) => {
       secure: process.env.NODE_ENV === "production",
       sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
       path: "/",
-      maxAge: 15 * 60 * 1000, // 15 min
+      maxAge: 60 * 60 * 1000, // 60 min
     });
 
     // Set refresh token cookie (long-lived, scoped to refresh endpoint)
@@ -273,3 +273,36 @@ export const loginFarmer = async (req, res) => {
   }
 };
 
+// getfarmerprofile for dashboard
+export const getFarmerProfile = async (req, res) => {
+  try {
+    const user_id = req.user.user_id;
+
+    const user = await pool.query("SELECT * FROM users WHERE id = $1 AND role = $2", [user_id, "farmer"]);
+    if (user.rows.length === 0) {
+      return res.status(404).json({ message: "Farmer not found" });
+    }
+    const farmInfo = await pool.query("select * from farmer_profiles where user_id=$1",[user.id]);
+    if (farmInfo.rows.length === 0) {
+      return res.status(404).json({ message: "Farmer profile not found" });
+    }
+    const documents = await pool.query("select * from documents where farmer_id =$1",[farmInfo.id]);
+
+    
+    const farmerProfile = {
+      name :user.name,
+      email:user.email,
+      phone:user.phone,
+      farmName:farmInfo.farm_name,
+      address:farmInfo.address,
+      deliveryRadius:farmInfo.delivery_radius_km,
+      cordinates:{latitude:farmInfo.latitude,longitude:farmInfo.longitude},
+      farmerStatus:farmInfo.status,
+      createdAt:farmInfo.createdAt,
+    }
+    res.status(200).json({ message: "Farmer profile fetched successfully", farmerProfile });
+  } catch (error) {
+    console.error("Get Farmer Profile Error:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};

@@ -45,7 +45,22 @@ export default function LoginPage() {
       }
       toast.success("Login successful")
     } catch (err) {
-      toast.error("Login failed", { description: err.message })
+      console.log(err)
+      toast.error(err.response.data.message )
+    } finally {
+      setIsLoading(false)
+    }
+  }
+  const handleForgotPassword = async (e) => {
+    e.preventDefault()
+    setIsLoading(true)
+    try {
+      const { data } = await api.post("/api/v1/auth/forgot-password", { email })
+      toast.success("New password sent to email")
+      router.push("/auth/login")
+    } catch (err) {
+      console.log(err)
+      toast.error(err.response.data.message )
     } finally {
       setIsLoading(false)
     }
@@ -104,7 +119,7 @@ export default function LoginPage() {
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <Label htmlFor="password">Password</Label>
-                    <Link href="/forgot-password" className="text-sm text-primary hover:underline">
+                    <Link href="/auth/forgot-password" className="text-sm text-primary hover:underline" onClick={handleForgotPassword}>
                       Forgot password?
                     </Link>
                   </div>

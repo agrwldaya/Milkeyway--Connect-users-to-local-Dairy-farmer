@@ -152,7 +152,7 @@ export const getFarmerById = async (req, res) => {
 export const approveFarmer = async (req, res) => {
   try {
     const { id } = req.params;
-    const adminId = req.user.id;
+    const adminId = req.user.user_id;
 
     const farmer = await pool.query(`
       SELECT * 

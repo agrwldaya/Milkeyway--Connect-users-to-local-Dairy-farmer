@@ -1,5 +1,6 @@
 // Common Logout Route
 import express from "express";
+import { forgotPassword } from "../controllers/autocontroller.js";
 const authRouter = express.Router();
 
 authRouter.post('/logout', (req, res) => {
@@ -22,4 +23,6 @@ authRouter.post('/logout', (req, res) => {
     return res.status(200).json({ message: 'Logged out' });
   });
 
-  export default authRouter;
+authRouter.post('/forgot-password', forgotPassword);
+
+export default authRouter;

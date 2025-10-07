@@ -4,6 +4,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Star, Milk } from "lucide-react"
  
 export default function LandingPage() {
+  
   return (
     <div className="min-h-screen bg-background overflow-x-hidden">
 

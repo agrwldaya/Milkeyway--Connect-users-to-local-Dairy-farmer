@@ -4,7 +4,7 @@ import { jwtVerify } from "jose";
 
 export async function middleware(req) {
   const token = req.cookies.get("token")?.value;
-
+   console.log("token",token)
   // No token: block access to protected routes
   if (!token) {
     return NextResponse.redirect(new URL("/auth/login", req.url));

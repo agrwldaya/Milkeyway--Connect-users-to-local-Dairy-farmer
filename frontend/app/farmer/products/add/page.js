@@ -30,7 +30,7 @@ export default function AddProductPage() {
     <div className="min-h-screen bg-background">
       <FarmerNav />
 
-      <main className="container py-8 px-5 max-w-4xl">
+      <main className="container py-8 px-5 ">
         <div className="mb-8">
           <Link href="/farmer/products">
             <Button variant="ghost" size="sm" className="mb-4">

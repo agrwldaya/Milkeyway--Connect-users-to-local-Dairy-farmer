@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation"
 import { api } from "@/lib/utils"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet" // Import Sheet components
 import {
@@ -22,6 +23,7 @@ export function ConsumerNav() {
   const router = useRouter()
   const [cartCount] = useState(3)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+  const [isConfirmOpen, setIsConfirmOpen] = useState(false)
   const handleLogout = async () => {
     try {
       await api.post("/api/v1/auth/logout")
@@ -95,7 +97,7 @@ export function ConsumerNav() {
                         <User className="h-5 w-5 text-muted-foreground" />
                         Profile
                     </Link>
-                    <button onClick={handleLogout} className="flex items-center gap-3 text-lg font-medium hover:text-primary transition-colors text-left">
+                    <button onClick={() => { setIsMobileMenuOpen(false); setIsConfirmOpen(true) }} className="flex items-center gap-3 text-lg font-medium hover:text-primary transition-colors text-left">
                         <LogOut className="h-5 w-5 text-muted-foreground" />
                         Logout
                     </button>
@@ -130,11 +132,25 @@ export function ConsumerNav() {
               <User className="h-4 w-4" />
             </Button>
           </Link>
-          <Button variant="ghost" size="sm" onClick={handleLogout} className="hidden md:block">
+          <Button variant="ghost" size="sm" onClick={() => setIsConfirmOpen(true)} className="hidden md:block">
             <LogOut className="h-4 w-4" />
           </Button>
         </div>
       </div>
+      <Dialog open={isConfirmOpen} onOpenChange={setIsConfirmOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Confirm logout</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to log out?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsConfirmOpen(false)}>Cancel</Button>
+            <Button variant="destructive" onClick={handleLogout}>Yes, log out</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </header>
   )
 }

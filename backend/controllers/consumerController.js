@@ -128,12 +128,46 @@ export const completeConsumerProfile = async (req, res) => {
     await pool.query(
       `INSERT INTO consumer_profiles (user_id, address, preferred_radius_km, latitude, longitude, status) 
        VALUES ($1, $2, $3, $4, $5, $6)`,
-      [user_id, address, preferred_radius_km, latitude, longitude, "draft"]
+      [user_id, address, preferred_radius_km, latitude, longitude, "active"]
     );
 }
     await pool.query("update users set status = $1 where id=$2", ["active", user_id]);
 
-    res.status(201).json({ message: "Consumer profile created successfully" });
+    // Generate tokens
+    const accessToken = generateAccessToken(user);
+    const refreshToken = generateRefreshToken(user);
+
+    // Save refreshToken in DB
+    await pool.query("UPDATE users SET refresh_token=$1 WHERE id=$2", [refreshToken, user_id]);
+
+    // Set access token cookie (short-lived)
+    res.cookie("token", accessToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+      path: "/",
+      maxAge: 15 * 60 * 1000, // 15 min
+    });
+
+    // Set refresh token cookie (long-lived, scoped to refresh endpoint)
+    res.cookie("refreshToken", refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+      path: "/refresh",
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    });
+
+    res.status(200).json({
+      message: "Profile completed successfully",
+      user: {
+        id: user_id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+      },
+    });
+
   } catch (error) {
     console.error("Complete Consumer Profile Error:", error);
     res.status(500).json({ message: "Internal server error" });

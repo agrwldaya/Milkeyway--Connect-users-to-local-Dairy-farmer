@@ -61,7 +61,7 @@ export default function ProfilePage() {
           <Card>
             <CardContent className="p-0">
               <div className="relative h-48 md:h-64 bg-muted">
-                <img src={coverImage || "/placeholder.svg"} alt="Farm cover" className="w-full h-full object-cover" />
+                <img src={'/farm_cover.jpg'} alt="Farm cover" className="w-full h-full object-cover" />
                 <label className="absolute bottom-4 right-4 cursor-pointer">
                   <Button type="button" size="sm" className="pointer-events-none">
                     <Camera className="h-4 w-4 mr-2" />
@@ -75,7 +75,7 @@ export default function ProfilePage() {
                   <div className="relative">
                     <div className="h-32 w-32 rounded-full border-4 border-background overflow-hidden bg-muted">
                       <img
-                        src={profileImage || "/placeholder.svg"}
+                        src={"/farmer_image.jpg"}
                         alt="Profile"
                         className="w-full h-full object-cover"
                       />
