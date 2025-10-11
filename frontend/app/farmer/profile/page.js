@@ -20,6 +20,8 @@ export default function ProfilePage() {
   const [coverImage, setCoverImage] = useState("/farm_cover.jpg")
   const [profileImage, setProfileImage] = useState("/farmer_image.jpg")
   const [farmImages, setFarmImages] = useState([])
+  const [isEditing, setIsEditing] = useState(false);
+   
 
   useEffect(() => {
     let active = true
@@ -53,27 +55,71 @@ export default function ProfilePage() {
     }
   }, [API_BASE])
 
-  const handleCoverUpload = (e) => {
+  const handleCoverUpload = async (e) => {
+
+    e.preventDefault()
     const file = e.target.files?.[0]
-    if (file) {
+    if (!file) return;
+
+    setIsLoading(true)
+    try {
+      const formData = new FormData()
+      formData.append("cover_image", file)
+      const res = await api.post(`${API_BASE}/api/v1/farmers/update-farm-cover`, formData, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      })
+      const data = res.data
+      if (res.status !== 200) throw new Error(data?.message || "Failed to upload cover image")
       setCoverImage(URL.createObjectURL(file))
+      if (res.status === 200) {
+        toast.success("Cover image updated successfully")
+      }
+    } catch (error) {
+      toast.error(error?.response?.data?.message || error.message || "Failed to upload cover image")
+    } finally {
+      setIsLoading(false)
     }
   }
 
-  const handleProfileUpload = (e) => {
+  const handleProfileUpload = async (e) => {
+    e.preventDefault()
     const file = e.target.files?.[0]
-    if (file) {
+    const fileName = file?.name
+    console.log("Selected file:", file)
+    if (!file) return
+    setIsLoading(true)
+    try {
+      const formData = new FormData()
+      formData.append("profile_image", file)
+      const res = await api.post(`${API_BASE}/api/v1/farmers/update-farmer-image`, formData, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      })
+      //console.log("Response from server:", res)
+      const data = res.data
+      console.log("Data from server:", data)
+      if (res.status !== 200) throw new Error(data?.message || "Failed to upload image")
       setProfileImage(URL.createObjectURL(file))
+      if (res.status === 200) {
+        toast.success("Profile image updated successfully")
+      }
+    } catch (error) {
+      toast.error(error?.response?.data?.message || error.message || "Failed to update profile image")
+    } finally {
+      setIsLoading(false)
     }
   }
 
-  const handleFarmImageUpload = (e) => {
-    const files = e.target.files
-    if (files) {
-      const newImages = Array.from(files).map((file) => URL.createObjectURL(file))
-      setFarmImages([...farmImages, ...newImages])
-    }
-  }
+  // const handleFarmImageUpload = (e) => {
+  //   const files = e.target.files
+  //   if (files) {
+  //     const newImages = Array.from(files).map((file) => URL.createObjectURL(file))
+  //     setFarmImages([...farmImages, ...newImages])
+  //   }
+  // }
 
   const removeFarmImage = (index) => {
     setFarmImages(farmImages.filter((_, i) => i !== index))
@@ -123,14 +169,21 @@ export default function ProfilePage() {
           <Card>
             <CardContent className="p-0">
               <div className="relative h-48 md:h-64 bg-muted">
-                <img src={coverImage} alt="Farm cover" className="w-full h-full object-cover" />
-                <label className="absolute bottom-4 right-4 cursor-pointer">
-                  <Button type="button" size="sm" className="pointer-events-none">
+                <label className="absolute top-4 right-4 cursor-pointer">
+                 <div className="flex items-center bg-primary text-white px-3 py-2 rounded-md">
                     <Camera className="h-4 w-4 mr-2" />
                     Change Cover
-                  </Button>
-                  <input type="file" className="hidden" accept="image/*" onChange={handleCoverUpload} />
+                  </div>
+                  <input
+                    type="file"
+                    className="hidden"
+                    accept="image/*"
+                    onChange={handleCoverUpload}
+                  />
                 </label>
+
+                <img src={coverImage} alt="Farm cover" className="w-full h-full object-cover" />
+                
               </div>
               <div className="px-6 pb-6">
                 <div className="flex flex-col md:flex-row gap-6 -mt-16 md:-mt-20">
@@ -180,19 +233,26 @@ export default function ProfilePage() {
 
           {/* Basic Information */}
           <Card>
-            <CardHeader>
+            <CardHeader className='relative'>
               <CardTitle>Basic Information</CardTitle>
               <CardDescription>Update your farm's basic details</CardDescription>
+              <div className="absolute right-4">
+              {/* {!isEditing?
+              <Button >edit</Button>:
+              <Button>save</Button>
+              } */}
+              </div>
             </CardHeader>
+            
             <CardContent className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="farmName">Farm Name *</Label>
-                <Input id="farmName" value={farmerProfile.farmName} readOnly />
+                <Input id="farmName" value={farmerProfile.farmName} readOnly={!isEditing} />
               </div>
 
               <div className="space-y-2">
                 <Label htmlFor="ownerName">Owner Name *</Label>
-                <Input id="ownerName" value={farmerProfile.name} readOnly />
+                <Input id="ownerName" value={farmerProfile.name} readOnly={!isEditing} />
               </div>
 
               <div className="grid gap-4 md:grid-cols-2">
@@ -200,7 +260,7 @@ export default function ProfilePage() {
                   <Label htmlFor="phone">Phone Number *</Label>
                   <div className="relative">
                     <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input id="phone" value={farmerProfile.phone} className="pl-10" readOnly />
+                    <Input id="phone" value={farmerProfile.phone} className="pl-10" readOnly={!isEditing} />
                   </div>
                 </div>
 
@@ -208,7 +268,7 @@ export default function ProfilePage() {
                   <Label htmlFor="email">Email Address</Label>
                   <div className="relative">
                     <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input id="email" type="email" value={farmerProfile.email} className="pl-10" readOnly />
+                    <Input id="email" type="email" value={farmerProfile.email} className="pl-10" readOnly={!isEditing} />
                   </div>
                 </div>
               </div>
@@ -222,7 +282,7 @@ export default function ProfilePage() {
                     value={farmerProfile.address}
                     className="pl-10"
                     rows={3}
-                    readOnly
+                    readOnly={!isEditing}
                   />
                 </div>
               </div>
@@ -230,14 +290,14 @@ export default function ProfilePage() {
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
                   <Label htmlFor="deliveryRadius">Delivery Radius (km)</Label>
-                  <Input id="deliveryRadius" value={farmerProfile.deliveryRadius} readOnly />
+                  <Input id="deliveryRadius" value={farmerProfile.deliveryRadius} readreadOnly={!isEditing}Only />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="coordinates">Coordinates</Label>
                   <Input 
                     id="coordinates" 
                     value={`${farmerProfile.coordinates.latitude}, ${farmerProfile.coordinates.longitude}`} 
-                    readOnly 
+                    readOnly={!isEditing} 
                   />
                 </div>
               </div>
@@ -248,13 +308,14 @@ export default function ProfilePage() {
                   id="description"
                   defaultValue="We are a family-run dairy farm with over 20 years of experience. Our cows are grass-fed and we follow traditional methods to produce high-quality dairy products."
                   rows={4}
+                  readOnly={!isEditing}
                 />
               </div>
             </CardContent>
           </Card>
 
           {/* Farm Details */}
-          <Card>
+          {/* <Card>
             <CardHeader>
               <CardTitle>Farm Details</CardTitle>
               <CardDescription>Provide details about your farm operations</CardDescription>
@@ -289,7 +350,7 @@ export default function ProfilePage() {
                 <Input id="specialization" defaultValue="A2 Cow Milk, Organic Ghee" />
               </div>
             </CardContent>
-          </Card>
+          </Card> */}
 
           {/* Documents */}
           <Card>
@@ -340,7 +401,7 @@ export default function ProfilePage() {
           </Card>
 
           {/* Farm Images */}
-          <Card>
+          {/* <Card>
             <CardHeader>
               <CardTitle>Farm Gallery</CardTitle>
               <CardDescription>Showcase your farm with photos (Max 10 images)</CardDescription>
@@ -374,17 +435,17 @@ export default function ProfilePage() {
                 )}
               </div>
             </CardContent>
-          </Card>
+          </Card> */}
 
           {/* Action Buttons */}
-          <div className="flex flex-col sm:flex-row gap-4 justify-end">
+          {/* <div className="flex flex-col sm:flex-row gap-4 justify-end">
             <Button type="button" variant="outline" className="w-full sm:w-auto bg-transparent">
               Edit Profile
             </Button>
-            <Button type="button" className="bg-primary hover:bg-primary/90 w-full sm:w-auto">
+            <Button  type="button" className="bg-primary hover:bg-primary/90 w-full sm:w-auto">
               Update Documents
             </Button>
-          </div>
+          </div> */}
         </form>
       </main>
     </div>

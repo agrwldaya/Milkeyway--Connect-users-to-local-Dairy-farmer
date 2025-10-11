@@ -4,6 +4,7 @@ import { sendVerificationEmail } from "../utils/sendVerificationEmail.js";
 import { uploadFiles } from "../utils/fileupload.js";
 import crypto from "crypto";
 import { generateAccessToken, generateRefreshToken } from "../utils/jwtUtils.js";
+ 
 
 
 // Register Farmer
@@ -572,6 +573,103 @@ export const updateProducts = async (req, res) => {
     });
   }
 };
+
+export const updateFarmerImage = async (req, res) => {
+  try {
+    const userId = req.user?.user_id || req.body.userId; // prefer auth middleware
+    // const {profile_image} = req.files;
+    console.log("UserID:", userId);
+    // console.log("File:", req.files.profile_image);
+
+    if (!userId) {
+      return res.status(400).json({ message: "User ID is required" });
+    }
+    const user = await pool.query("SELECT * FROM users WHERE id=$1", [userId]);
+    if (user.rows.length === 0) {
+      return res.status(404).json({ message: "Farmer not found" });
+    }
+    const farmer = await pool.query("SELECT * FROM farmer_profiles WHERE user_id=$1", [userId]);
+    if (farmer.rows.length === 0) {
+      return res.status(404).json({ message: "Farmer profile not found" });
+    }
+    const farmer_id = farmer.rows[0].id;
+    const farmer_docs = await pool.query("SELECT * FROM farmer_docs WHERE farmer_id=$1", [farmer_id]);
+    if (farmer_docs.rows.length === 0) {
+      return res.status(404).json({ message: "Farmer documents not found, upload documents first" });
+    }
+      // Check if file is present 
+    if (!req.files || !req.files.profile_image) {
+      return res.status(400).json({ message: "No image file uploaded" });
+    }
+     
+    const { uploadedUrls } = await uploadFiles({ farmer_doc: req.files.profile_image }, "farmer_doc");
+    if (uploadedUrls.length === 0) {
+      return res.status(500).json({ message: "Image upload failed" });
+    }
+
+    // Save the uploaded image URLs to the database
+    await pool.query(
+      "UPDATE farmer_docs SET farmer_image_url = $1 WHERE farmer_id = $2",
+      [uploadedUrls[0], farmer_id]  
+    );
+    res.status(200).json({ message: "Farmer image updated successfully", imageUrl: uploadedUrls[0] }); 
+
+  } catch (error) {
+    console.error("Update Farmer Image Error:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+}
+export const updateFarmCover = async (req, res) => {
+  try {
+    const userId = req.user?.user_id || req.body.userId; // prefer auth middleware
+    if (!userId) {
+      return res.status(400).json({ message: "User ID is required" });
+    }
+    // console.log("UserID:", userId);
+    //console.log("File:", req.files.cover_image);
+    const user = await pool.query("SELECT * FROM users WHERE id=$1", [userId]);
+    if (user.rows.length === 0) {
+      return res.status(404).json({ message: "Farmer not found" });
+    }
+   // console.log("users:", user.rows[0]);
+    const farmer = await pool.query("SELECT * FROM farmer_profiles WHERE user_id=$1", [userId]);
+    if (farmer.rows.length === 0) {
+      return res.status(404).json({ message: "Farmer profile not found" });
+    }
+    //console.log("farmer:", farmer.rows[0]);
+    const farmer_id = farmer.rows[0].id;
+    const farmer_docs = await pool.query("SELECT * FROM farmer_docs WHERE farmer_id=$1", [farmer_id]);
+    if (farmer_docs.rows.length === 0) {
+      return res.status(404).json({ message: "Farmer documents not found, upload documents first" });
+    }
+    //console.log("farmer_docs:", farmer_docs.rows[0]);
+
+      // Check if file is present 
+
+    if (!req.files || !req.files.cover_image) {
+      return res.status(400).json({ message: "No image file uploaded" });
+    }
+
+    const { uploadedUrls } = await uploadFiles({ farmer_doc: req.files.cover_image }, "farmer_doc");
+
+    if (uploadedUrls.length === 0) {
+      return res.status(500).json({ message: "Image upload failed" });
+    }
+    //console.log("Uploaded URLs:", uploadedUrls);
+    // Save the uploaded image URLs to the database
+    await pool.query(
+      "UPDATE farmer_docs SET farm_image_url = $1 WHERE farmer_id = $2",
+      [uploadedUrls[0], farmer_id]  
+    );
+    //console.log("Farmer image URL updated in DB");
+    res.status(200).json({ message: "Farmer image updated successfully", imageUrl: uploadedUrls[0] }); 
+
+  } catch (error) {
+    console.error("Update Farmer Image Error:", error);
+    console.log(error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+}
 
 
 

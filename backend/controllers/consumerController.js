@@ -306,4 +306,223 @@ export const loginConsumer = async (req, res) => {
   }
 };
 
+// Get nearby farmers based on consumer location
+export const getNearbyFarmers = async (req, res) => {
+  try {
+    const { latitude, longitude, radius = 10 } = req.query;
+    
+    console.log(latitude, longitude, radius);
+
+    if (!latitude || !longitude) {
+      return res.status(400).json({ message: "Latitude and longitude are required" });
+    }
+
+    // Convert to numbers
+    const userLat = parseFloat(latitude);
+    const userLng = parseFloat(longitude);
+    const searchRadius = parseFloat(radius);
+
+    // SQL query to find farmers within radius using Haversine formula
+    const query = `
+      SELECT 
+        f.id as farmer_id,
+        u.name as farmer_name,
+        u.email,
+        u.phone,
+        f.farm_name,
+        f.address,
+        f.latitude,
+        f.longitude,
+        f.delivery_radius_km,
+        u.is_verified,
+        f.status,
+        fd.farm_image_url,
+        fd.farmer_image_url,
+        (
+          6371 * acos(
+            cos(radians($1)) * cos(radians(f.latitude)) * 
+            cos(radians(f.longitude) - radians($2)) + 
+            sin(radians($1)) * sin(radians(f.latitude))
+          )
+        ) AS distance_km,
+        COUNT(p.id) as product_count
+      FROM farmer_profiles f
+      JOIN users u ON f.user_id = u.id
+      LEFT JOIN farmer_docs fd ON f.id = fd.farmer_id
+      LEFT JOIN products p ON f.id = p.farmer_id
+      WHERE f.status = 'approved' 
+        AND f.latitude IS NOT NULL 
+        AND f.longitude IS NOT NULL
+        AND (
+          6371 * acos(
+            cos(radians($1)) * cos(radians(f.latitude)) * 
+            cos(radians(f.longitude) - radians($2)) + 
+            sin(radians($1)) * sin(radians(f.latitude))
+          )
+        ) <= $3
+      GROUP BY f.id, u.name, u.email, u.phone, f.farm_name, f.address, 
+               f.latitude, f.longitude, f.delivery_radius_km, u.is_verified, f.status,
+               fd.farm_image_url, fd.farmer_image_url
+      ORDER BY distance_km ASC
+    `;
+
+    const result = await pool.query(query, [userLat, userLng, searchRadius]);
+
+    // Format the response
+    const farmers = result.rows.map(farmer => ({
+      id: farmer.farmer_id,
+      name: farmer.farm_name,
+      owner: farmer.farmer_name,
+      email: farmer.email,
+      phone: farmer.phone,
+      address: farmer.address,
+      latitude: farmer.latitude,
+      longitude: farmer.longitude,
+      image: farmer.farm_image_url,
+      coverImage: farmer.farmer_image_url,
+      description: "Fresh dairy products from a trusted local farmer.",
+      rating: 4.5, // Default rating since it's not in the current schema
+      reviews: 0, // Default reviews since it's not in the current schema
+      products: farmer.product_count || 0,
+      distance: `${farmer.distance_km.toFixed(1)} km`,
+      verified: farmer.is_verified,
+      status: farmer.status,
+      deliveryRadius: farmer.delivery_radius_km
+    }));
+
+    res.status(200).json({
+      success: true,
+      message: `Found ${farmers.length} farmers within ${searchRadius}km`,
+      farmers,
+      searchParams: {
+        latitude: userLat,
+        longitude: userLng,
+        radius: searchRadius
+      }
+    });
+
+  } catch (error) {
+    console.error("Get Nearby Farmers Error:", error);
+    res.status(500).json({ 
+      success: false, 
+      message: "Internal server error",
+      error: error.message 
+    });
+  }
+};
+
+// Get farmer details with products
+export const getFarmerDetails = async (req, res) => {
+  try {
+    const { farmerId } = req.params;
+
+    if (!farmerId) {
+      return res.status(400).json({ message: "Farmer ID is required" });
+    }
+
+    // Get farmer profile
+    const farmerQuery = `
+      SELECT 
+        f.id as farmer_id,
+        u.name as farmer_name,
+        u.email,
+        u.phone,
+        f.farm_name,
+        f.address,
+        f.latitude,
+        f.longitude,
+        f.delivery_radius_km,
+        u.is_verified,
+        f.status,
+        fd.farm_image_url,
+        fd.farmer_image_url,
+        fd.farmer_proof_doc_url,
+        fd.is_doc_verified
+      FROM farmer_profiles f
+      JOIN users u ON f.user_id = u.id
+      LEFT JOIN farmer_docs fd ON f.id = fd.farmer_id
+      WHERE f.id = $1 AND f.status = 'approved'
+    `;
+
+    const farmerResult = await pool.query(farmerQuery, [farmerId]);
+
+    if (farmerResult.rows.length === 0) {
+      return res.status(404).json({ message: "Farmer not found" });
+    }
+
+    const farmer = farmerResult.rows[0];
+
+    // Get farmer's products
+    const productsQuery = `
+      SELECT 
+        p.id,
+        p.product_name,
+        p.description,
+        p.price,
+        p.unit,
+        p.stock_quantity,
+        p.product_image,
+        c.category_name,
+        mc.milk_category_name
+      FROM products p
+      LEFT JOIN categories c ON p.category_id = c.id
+      LEFT JOIN milk_categories mc ON p.milk_category_id = mc.id
+      WHERE p.farmer_id = $1
+      ORDER BY p.created_at DESC
+    `;
+
+    const productsResult = await pool.query(productsQuery, [farmerId]);
+
+    // Format the response
+    const farmerData = {
+      id: farmer.farmer_id,
+      name: farmer.farm_name,
+      owner: farmer.farmer_name,
+      email: farmer.email,
+      phone: farmer.phone,
+      address: farmer.address,
+      latitude: farmer.latitude,
+      longitude: farmer.longitude,
+      image: farmer.farm_image_url,
+      coverImage: farmer.farmer_image_url,
+      description: farmer.farm_description || "Fresh dairy products from a trusted local farmer.",
+      rating: farmer.rating || 0,
+      reviews: farmer.total_reviews || 0,
+      deliveryRadius: farmer.delivery_radius_km,
+      verified: farmer.is_verified,
+      status: farmer.status,
+      documents: farmer.farmer_proof_doc_url ? {
+        farm_image_url: farmer.farm_image_url,
+        farmer_image_url: farmer.farmer_image_url,
+        farmer_proof_doc_url: farmer.farmer_proof_doc_url,
+        is_doc_verified: farmer.is_doc_verified
+      } : null,
+      products: productsResult.rows.map(product => ({
+        id: product.id,
+        name: product.product_name,
+        description: product.description,
+        price: product.price,
+        unit: product.unit,
+        stock: product.stock_quantity,
+        image: product.product_image,
+        category: product.category_name,
+        milkCategory: product.milk_category_name
+      }))
+    };
+
+    res.status(200).json({
+      success: true,
+      farmer: farmerData
+    });
+
+  } catch (error) {
+    console.error("Get Farmer Details Error:", error);
+    res.status(500).json({ 
+      success: false, 
+      message: "Internal server error",
+      error: error.message 
+    });
+  }
+};
+
 

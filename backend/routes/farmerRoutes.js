@@ -9,6 +9,8 @@ import {
   updateProducts,
   showcategories,
   getFarmerProfile,
+  updateFarmerImage,
+  updateFarmCover,
 } from "../controllers/farmerController.js";
 import { verifyOtp } from "../controllers/autocontroller.js";
 import { authMiddleware } from "../middleware/authMiddleWare.js";
@@ -38,5 +40,8 @@ farmerRouter.get("/showcategories", showcategories);
 farmerRouter.post("/login", loginFarmer);
 
 farmerRouter.get("/profile", authMiddleware, getFarmerProfile)
+
+farmerRouter.post("/update-farmer-image", authMiddleware, updateFarmerImage);
+farmerRouter.post("/update-farm-cover", authMiddleware, updateFarmCover);
 
 export default farmerRouter;

@@ -3,8 +3,11 @@ import {
   registerConsumer,
   completeConsumerProfile,
   loginConsumer,
+  getNearbyFarmers,
+  getFarmerDetails,
 } from "../controllers/consumerController.js";
 import { verifyOtp } from "../controllers/autocontroller.js";
+import { authMiddleware } from "../middleware/authMiddleWare.js";
 
 const consumerRouter = express.Router();
 
@@ -22,6 +25,12 @@ consumerRouter.post("/profile/:user_id", completeConsumerProfile);
 
 //login consumer
 consumerRouter.post("/login", loginConsumer);
+
+// Get nearby farmers based on location
+consumerRouter.get("/nearby-farmers", getNearbyFarmers);
+
+// Get specific farmer details with products
+consumerRouter.get("/farmer/:farmerId", getFarmerDetails);
 
 
 export default consumerRouter;

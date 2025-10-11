@@ -1,72 +1,78 @@
 "use client"
 
+import { useState, useEffect } from "react"
 import Link from "next/link"
+import { useParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { MapPin, Star, Heart, Phone, Mail, Award, Truck, ShoppingCart, ChevronLeft } from "lucide-react"
+import { MapPin, Star, Heart, Phone, Mail, Award, Truck, ShoppingCart, ChevronLeft, Loader2, AlertCircle } from "lucide-react"
 import { ConsumerNav } from "@/components/consumer-nav"
 
 export default function FarmerProfilePage() {
-  const farmer = {
-    id: 1,
-    name: "Green Valley Farm",
-    owner: "Ramesh Patel",
-    location: "Andheri West, Mumbai",
-    distance: "2.5 km",
-    rating: 4.8,
-    reviews: 124,
-    image: "/dairy-farm-green-fields-cows.jpg",
-    coverImage: "/dairy-farm-landscape.jpg",
-    verified: true,
-    phone: "+91 98765 43210",
-    email: "ramesh@greenvalley.com",
-    description:
-      "Green Valley Farm is a family-owned organic dairy farm established in 2010. We pride ourselves on maintaining the highest standards of animal welfare and producing the freshest, most nutritious dairy products. Our cows are grass-fed and raised in natural, stress-free conditions.",
-    certifications: ["Organic Certified", "FSSAI Licensed", "Animal Welfare Approved"],
-    deliveryInfo: "Daily delivery between 6 AM - 9 AM. Free delivery within 5 km.",
+  const params = useParams()
+  const [farmer, setFarmer] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+
+  useEffect(() => {
+    const fetchFarmerDetails = async () => {
+      try {
+        setLoading(true)
+        const response = await fetch(`/api/v1/consumers/farmer/${params.id}`)
+        const data = await response.json()
+        
+        if (data.success) {
+          setFarmer(data.farmer)
+        } else {
+          setError(data.message || "Failed to fetch farmer details")
+        }
+      } catch (err) {
+        console.error("Error fetching farmer details:", err)
+        setError("Failed to fetch farmer details")
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    if (params.id) {
+      fetchFarmerDetails()
+    }
+  }, [params.id])
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <ConsumerNav />
+        <main className="container py-8">
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            <span className="ml-2 text-muted-foreground">Loading farmer details...</span>
+          </div>
+        </main>
+      </div>
+    )
   }
 
-  const products = [
-    {
-      id: 1,
-      name: "Fresh Cow Milk",
-      price: 60,
-      unit: "L",
-      rating: 4.8,
-      image: "/fresh-cow-milk-bottle.jpg",
-      inStock: true,
-    },
-    {
-      id: 2,
-      name: "Buffalo Milk",
-      price: 75,
-      unit: "L",
-      rating: 4.9,
-      image: "/buffalo-milk-bottle.jpg",
-      inStock: true,
-    },
-    {
-      id: 3,
-      name: "Pure Desi Ghee",
-      price: 550,
-      unit: "kg",
-      rating: 4.9,
-      image: "/pure-desi-ghee-jar.jpg",
-      inStock: true,
-    },
-    {
-      id: 4,
-      name: "Fresh Curd",
-      price: 70,
-      unit: "kg",
-      rating: 4.7,
-      image: "/thick-curd-bowl.jpg",
-      inStock: true,
-    },
-  ]
+  if (error || !farmer) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <ConsumerNav />
+        <main className="container py-8">
+          <Card className="p-8 text-center">
+            <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
+            <h2 className="text-xl font-semibold mb-2">Error Loading Farmer</h2>
+            <p className="text-muted-foreground mb-4">{error || "Farmer not found"}</p>
+            <Link href="/consumer/dashboard">
+              <Button>Back to Dashboard</Button>
+            </Link>
+          </Card>
+        </main>
+      </div>
+    )
+  }
 
   const reviews = [
     {
@@ -79,7 +85,7 @@ export default function FarmerProfilePage() {
       name: "Amit Patel",
       rating: 5,
       date: "1 week ago",
-      comment: "Best dairy farm in the area. Ramesh is very professional and the products are top-notch.",
+      comment: "Best dairy farm in the area. Very professional and the products are top-notch.",
     },
     {
       name: "Sneha Reddy",
@@ -103,7 +109,7 @@ export default function FarmerProfilePage() {
 
         {/* Cover Image */}
         <div className="relative h-64 rounded-2xl overflow-hidden mb-8 bg-gray-100">
-          <img src={farmer.coverImage || "/placeholder.svg"} alt={farmer.name} className="h-full w-full object-cover" />
+          <img src={farmer.coverImage || farmer.image || "/farmer.jpg"} alt={farmer.name} className="h-full w-full object-cover" />
         </div>
 
         {/* Farmer Info */}
@@ -121,13 +127,12 @@ export default function FarmerProfilePage() {
                     <div className="flex items-center gap-4">
                       <div className="flex items-center gap-1">
                         <MapPin className="h-5 w-5 text-muted-foreground" />
-                        <span>{farmer.location}</span>
-                        <span className="text-muted-foreground">({farmer.distance})</span>
+                        <span>{farmer.address}</span>
                       </div>
                       <div className="flex items-center gap-1">
                         <Star className="h-5 w-5 fill-yellow-400 text-yellow-400" />
-                        <span className="font-semibold">{farmer.rating}</span>
-                        <span className="text-muted-foreground">({farmer.reviews} reviews)</span>
+                        <span className="font-semibold">{farmer.rating?.toFixed(1) || '4.5'}</span>
+                        <span className="text-muted-foreground">({farmer.reviews || 0} reviews)</span>
                       </div>
                     </div>
                   </div>
@@ -140,23 +145,36 @@ export default function FarmerProfilePage() {
 
                 <div className="mb-6">
                   <h2 className="text-xl font-bold mb-3">About the Farm</h2>
-                  <p className="text-muted-foreground leading-relaxed">{farmer.description}</p>
+                  <p className="text-muted-foreground leading-relaxed">
+                    {farmer.description || "This farmer provides fresh dairy products with a focus on quality and sustainability."}
+                  </p>
                 </div>
 
                 <div className="grid sm:grid-cols-3 gap-4 mb-6">
-                  {farmer.certifications.map((cert, index) => (
-                    <div key={index} className="flex items-center gap-2 p-3 bg-gray-50 rounded-lg">
-                      <Award className="h-5 w-5 text-primary" />
-                      <span className="text-sm font-medium">{cert}</span>
-                    </div>
-                  ))}
+                  <div className="flex items-center gap-2 p-3 bg-gray-50 rounded-lg">
+                    <Award className="h-5 w-5 text-primary" />
+                    <span className="text-sm font-medium">FSSAI Licensed</span>
+                  </div>
+                  <div className="flex items-center gap-2 p-3 bg-gray-50 rounded-lg">
+                    <Award className="h-5 w-5 text-primary" />
+                    <span className="text-sm font-medium">Quality Assured</span>
+                  </div>
+                  <div className="flex items-center gap-2 p-3 bg-gray-50 rounded-lg">
+                    <Award className="h-5 w-5 text-primary" />
+                    <span className="text-sm font-medium">Fresh Daily</span>
+                  </div>
                 </div>
 
                 <div className="flex items-start gap-3 p-4 bg-blue-50 rounded-lg">
                   <Truck className="h-5 w-5 text-blue-600 mt-0.5" />
                   <div>
                     <p className="font-medium text-blue-900 mb-1">Delivery Information</p>
-                    <p className="text-sm text-blue-700">{farmer.deliveryInfo}</p>
+                    <p className="text-sm text-blue-700">
+                      {farmer.deliveryRadius 
+                        ? `Delivery available within ${farmer.deliveryRadius}km radius. Contact farmer for timing and details.`
+                        : 'Contact farmer directly for delivery details and timing.'
+                      }
+                    </p>
                   </div>
                 </div>
               </CardContent>
@@ -202,48 +220,64 @@ export default function FarmerProfilePage() {
         {/* Products and Reviews Tabs */}
         <Tabs defaultValue="products" className="space-y-6">
           <TabsList className="bg-white">
-            <TabsTrigger value="products">Products ({products.length})</TabsTrigger>
+            <TabsTrigger value="products">Products ({farmer.products?.length || 0})</TabsTrigger>
             <TabsTrigger value="reviews">Reviews ({reviews.length})</TabsTrigger>
           </TabsList>
 
           <TabsContent value="products">
-            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-              {products.map((product) => (
-                <Card key={product.id} className="overflow-hidden group hover:shadow-lg transition-shadow bg-white">
-                  <Link href={`/consumer/product/${product.id}`}>
-                    <div className="relative aspect-square overflow-hidden bg-gray-100">
-                      <img
-                        src={product.image || "/placeholder.svg"}
-                        alt={product.name}
-                        className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-300"
-                      />
-                    </div>
-                  </Link>
-                  <CardContent className="p-5">
+            {farmer.products && farmer.products.length > 0 ? (
+              <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+                {farmer.products.map((product) => (
+                  <Card key={product.id} className="overflow-hidden group hover:shadow-lg transition-shadow bg-white">
                     <Link href={`/consumer/product/${product.id}`}>
-                      <h3 className="font-semibold text-lg mb-3 hover:text-primary transition-colors">
-                        {product.name}
-                      </h3>
-                    </Link>
-
-                    <div className="flex items-center justify-between mb-4">
-                      <span className="text-xl font-bold text-primary">
-                        ₹{product.price}/{product.unit}
-                      </span>
-                      <div className="flex items-center gap-1">
-                        <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-                        <span className="text-sm font-medium">{product.rating}</span>
+                      <div className="relative aspect-square overflow-hidden bg-gray-100">
+                        <img
+                          src={product.image || "/placeholder.svg"}
+                          alt={product.name}
+                          className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-300"
+                        />
                       </div>
-                    </div>
+                    </Link>
+                    <CardContent className="p-5">
+                      <Link href={`/consumer/product/${product.id}`}>
+                        <h3 className="font-semibold text-lg mb-3 hover:text-primary transition-colors">
+                          {product.name}
+                        </h3>
+                      </Link>
 
-                    <Button size="sm" className="w-full bg-primary hover:bg-primary/90">
-                      <ShoppingCart className="h-4 w-4 mr-2" />
-                      Add to Cart
-                    </Button>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
+                      <div className="flex items-center justify-between mb-4">
+                        <span className="text-xl font-bold text-primary">
+                          ₹{product.price}/{product.unit}
+                        </span>
+                        <div className="flex items-center gap-1">
+                          <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
+                          <span className="text-sm font-medium">4.5</span>
+                        </div>
+                      </div>
+
+                      <div className="mb-3">
+                        <p className="text-sm text-muted-foreground mb-1">
+                          {product.category} • {product.milkCategory}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          Stock: {product.stock} {product.unit}
+                        </p>
+                      </div>
+
+                      <Button size="sm" className="w-full bg-primary hover:bg-primary/90">
+                        <ShoppingCart className="h-4 w-4 mr-2" />
+                        Add to Cart
+                      </Button>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            ) : (
+              <Card className="p-8 text-center">
+                <h3 className="text-lg font-semibold mb-2">No Products Available</h3>
+                <p className="text-muted-foreground">This farmer hasn't added any products yet.</p>
+              </Card>
+            )}
           </TabsContent>
 
           <TabsContent value="reviews">
