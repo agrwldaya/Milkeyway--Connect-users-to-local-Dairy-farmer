@@ -4,6 +4,7 @@ import { sendVerificationEmail } from "../utils/sendVerificationEmail.js";
 import { uploadFiles } from "../utils/fileupload.js";
 import crypto from "crypto";
 import { generateAccessToken, generateRefreshToken } from "../utils/jwtUtils.js";
+// Note: Activity tracking moved to connectionController.js
  
 
 
@@ -670,6 +671,12 @@ export const updateFarmCover = async (req, res) => {
     res.status(500).json({ message: "Internal server error" });
   }
 }
+
+// Note: getFarmerRequests and respondToRequest functions moved to connectionController.js
+// Use: 
+// - GET /api/v1/connections/farmer/requests
+// - POST /api/v1/connections/farmer/requests/:requestId/respond
+
 
 
 

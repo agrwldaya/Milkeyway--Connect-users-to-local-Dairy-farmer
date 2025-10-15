@@ -6,6 +6,7 @@ import farmerRouter from './routes/farmerRoutes.js';
 import fileUpload from "express-fileupload";
 import consumerRouter from './routes/consumerRoute.js';
 import AdminRouter from './routes/adminRoute.js';
+import connectionRouter from './routes/connectionRoutes.js';
 import cors from 'cors';
 import authRouter from './routes/auth.js';
 import cookieParser from 'cookie-parser';
@@ -50,6 +51,7 @@ startServer();
 app.use('/api/v1/farmers',farmerRouter);
 app.use('/api/v1/consumers',consumerRouter);
 app.use('/api/v1/admin', AdminRouter);
+app.use('/api/v1/connections', connectionRouter);
 
 //logout route
 app.use('/api/v1/auth', authRouter);

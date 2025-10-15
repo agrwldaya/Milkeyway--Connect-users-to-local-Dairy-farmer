@@ -204,27 +204,94 @@ export const approveFarmer = async (req, res) => {
 };
 
 // ❌ Reject Farmer
-// export const rejectFarmer = async (req, res) => {
-//   try {
-//     const { id } = req.params;
-//     const { reason } = req.body;
-//     const adminId = req.body.userId;
+export const rejectFarmer = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { reason } = req.body;
+    const adminId = req.user.user_id;
 
-//     const farmer = await pool.query("SELECT * FROM farmers WHERE id=$1", [id]);
-//     if (farmer.rows.length === 0)
-//       return res.status(404).json({ success: false, message: "Farmer not found" });
+    const farmer = await pool.query(`
+      SELECT * 
+      FROM users u
+      JOIN farmer_profiles fp ON u.id = fp.user_id
+      WHERE u.role = 'farmer' AND u.id = $1
+    `, [id]);
 
-//     await pool.query("UPDATE users SET status='inactive' WHERE id=$1", [id]);
-//     await pool.query("UPDATE farmer_profiles SET status='rejected' WHERE user_id=$1", [id]);
-//     await pool.query("update documents set is_verified = $1 where farmer_id=$2", [false, id]);
+    if (farmer.rows.length === 0)
+      return res.status(404).json({ success: false, message: "Farmer not found" });
 
-//     await logAdminAction(adminId, id, "REJECT", reason);
+    const farmerProfileId = farmer.rows[0].id; // This is the farmer_profiles.id
 
-//     res.status(200).json({ success: true, message: "Farmer rejected successfully" });
-//   } catch (error) {
-//     res.status(500).json({ success: false, message: "Internal Server Error" });
-//   }
-// };
+    await pool.query("UPDATE users SET status = $1 WHERE id = $2", ["inactive", id]);
+    await pool.query("UPDATE farmer_profiles SET status = 'rejected' WHERE user_id = $1", [id]);
+    await pool.query("UPDATE farmer_docs SET is_doc_verified = $1 WHERE farmer_id = $2", [false, farmerProfileId]);
+
+    await logAdminAction(adminId, id, "REJECT", reason);
+
+    res.status(200).json({ success: true, message: "Farmer rejected successfully" });
+  } catch (error) {
+    console.error("Reject Farmer Error:", error);
+    res.status(500).json({ success: false, message: "Internal Server Error" });
+  }
+};
+
+// 📋 Get Pending Farmers (for approval page)
+export const getPendingFarmers = async (req, res) => {
+  try {
+    const query = `
+      SELECT u.id, u.name, u.email, u.phone, u.status as user_status, u.created_at as user_created_at,
+             fp.id as farmer_profile_id, fp.farm_name, fp.address, fp.latitude, fp.longitude, fp.delivery_radius_km, fp.status as profile_status, fp.created_at as profile_created_at,
+             fd.farm_image_url, fd.farmer_image_url, fd.farmer_proof_doc_url, fd.is_doc_verified, fd.created_at as doc_created_at
+      FROM users u
+      JOIN farmer_profiles fp ON u.id = fp.user_id
+      LEFT JOIN farmer_docs fd ON fp.id = fd.farmer_id
+      WHERE u.role = 'farmer' AND (fp.status = 'draft' OR fp.status = 'rejected' or fp.status = 'pending')
+      ORDER BY fp.created_at DESC;
+    `;
+
+    const result = await pool.query(query);
+
+    // Structure the data properly
+    const farmers = result.rows.map(row => ({
+      id: row.id,
+      name: row.name,
+      email: row.email,
+      phone: row.phone,
+      user_status: row.user_status,
+      user_created_at: row.user_created_at,
+      profile: {
+        farmer_profile_id: row.farmer_profile_id,
+        farm_name: row.farm_name,
+        address: row.address,
+        latitude: row.latitude,
+        longitude: row.longitude,
+        delivery_radius_km: row.delivery_radius_km,
+        status: row.profile_status,
+        created_at: row.profile_created_at
+      },
+      documents: {
+        farm_image_url: row.farm_image_url,
+        farmer_image_url: row.farmer_image_url,
+        farmer_proof_doc_url: row.farmer_proof_doc_url,
+        is_doc_verified: row.is_doc_verified || false,
+        doc_created_at: row.doc_created_at
+      }
+    }));
+
+    res.status(200).json({
+      success: true,
+      totalFarmers: farmers.length,
+      farmers: farmers,
+    });
+  } catch (error) {
+    console.error("Get Pending Farmers Error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Internal Server Error",
+      error: error.message,
+    });
+  }
+};
 
 // // 🔒 Suspend Farmer
 // export const suspendFarmer = async (req, res) => {

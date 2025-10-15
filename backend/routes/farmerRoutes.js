@@ -44,4 +44,9 @@ farmerRouter.get("/profile", authMiddleware, getFarmerProfile)
 farmerRouter.post("/update-farmer-image", authMiddleware, updateFarmerImage);
 farmerRouter.post("/update-farm-cover", authMiddleware, updateFarmCover);
 
+// Note: Request management functionality moved to connectionController.js
+// Use: 
+// - GET /api/v1/connections/farmer/requests
+// - POST /api/v1/connections/farmer/requests/:requestId/respond
+
 export default farmerRouter;

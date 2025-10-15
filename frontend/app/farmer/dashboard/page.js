@@ -2,7 +2,7 @@ import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Package, ShoppingCart, DollarSign, Clock, Plus, Edit, Trash2, CheckCircle, XCircle } from "lucide-react"
+import { Package, Users, MessageCircle, Activity, Plus, Edit, Trash2, CheckCircle, XCircle, UserPlus } from "lucide-react"
 import { FarmerNav } from "@/components/farmer-nav"
 
 export default function FarmerDashboard() {
@@ -13,7 +13,7 @@ export default function FarmerDashboard() {
       <main className="container py-8  px-5 ">
         <div className="mb-8">
           <h1 className="text-4xl font-serif font-bold mb-2">Welcome back, Ramesh!</h1>
-          <p className="text-muted-foreground">Here's what's happening with your farm today</p>
+          <p className="text-muted-foreground">Manage your connections and grow your consumer network</p>
         </div>
 
         {/* Stats Overview */}
@@ -33,52 +33,54 @@ export default function FarmerDashboard() {
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Active Orders</CardTitle>
-              <ShoppingCart className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-sm font-medium">Active Connections</CardTitle>
+              <Users className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold">24</div>
+              <p className="text-xs text-muted-foreground mt-1">
+                <span className="text-primary">+5</span> this week
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium">Pending Requests</CardTitle>
+              <MessageCircle className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold">8</div>
               <p className="text-xs text-muted-foreground mt-1">
-                <span className="text-secondary">3</span> pending approval
+                <span className="text-secondary">3</span> new today
               </p>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Monthly Earnings</CardTitle>
-              <DollarSign className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-sm font-medium">Profile Views</CardTitle>
+              <Activity className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold">₹45,230</div>
+              <div className="text-3xl font-bold">156</div>
               <p className="text-xs text-muted-foreground mt-1">
-                <span className="text-primary">+12%</span> from last month
+                <span className="text-primary">+23%</span> this week
               </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Pending Approvals</CardTitle>
-              <Clock className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold">2</div>
-              <p className="text-xs text-muted-foreground mt-1">New product listings</p>
             </CardContent>
           </Card>
         </div>
 
         <div className="grid gap-6 lg:grid-cols-2">
-          {/* Recent Orders */}
+          {/* Recent Connection Requests */}
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div>
-                  <CardTitle>Recent Orders</CardTitle>
-                  <CardDescription>Orders requiring your attention</CardDescription>
+                  <CardTitle>Recent Connection Requests</CardTitle>
+                  <CardDescription>Consumer requests awaiting your response</CardDescription>
                 </div>
-                <Link href="/farmer/orders">
+                <Link href="/farmer/requests">
                   <Button variant="outline" size="sm">
                     View All
                   </Button>
@@ -89,55 +91,53 @@ export default function FarmerDashboard() {
               <div className="space-y-4">
                 {[
                   {
-                    id: "#ORD-001",
-                    customer: "Priya Sharma",
+                    id: "#REQ-001",
+                    consumer: "Priya Sharma",
                     product: "Fresh Cow Milk",
                     quantity: "5L",
-                    amount: "₹300",
+                    message: "Looking for fresh milk delivery",
                     status: "pending",
                   },
                   {
-                    id: "#ORD-002",
-                    customer: "Amit Patel",
+                    id: "#REQ-002",
+                    consumer: "Amit Patel",
                     product: "Pure Desi Ghee",
                     quantity: "1kg",
-                    amount: "₹550",
-                    status: "confirmed",
-                  },
-                  {
-                    id: "#ORD-003",
-                    customer: "Anjali Desai",
-                    product: "Homemade Paneer",
-                    quantity: "500g",
-                    amount: "₹175",
+                    message: "Need ghee for home use",
                     status: "pending",
                   },
-                ].map((order) => (
-                  <div key={order.id} className="flex items-center justify-between p-4 border rounded-lg">
+                  {
+                    id: "#REQ-003",
+                    consumer: "Anjali Desai",
+                    product: "Homemade Paneer",
+                    quantity: "500g",
+                    message: "Regular customer, weekly order",
+                    status: "pending",
+                  },
+                ].map((request) => (
+                  <div key={request.id} className="flex items-center justify-between p-4 border rounded-lg">
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-1">
-                        <p className="font-semibold text-sm">{order.id}</p>
-                        <Badge variant={order.status === "pending" ? "secondary" : "default"} className="text-xs">
-                          {order.status}
+                        <p className="font-semibold text-sm">{request.id}</p>
+                        <Badge variant={request.status === "pending" ? "secondary" : "default"} className="text-xs">
+                          {request.status}
                         </Badge>
                       </div>
-                      <p className="text-sm text-muted-foreground">{order.customer}</p>
+                      <p className="text-sm text-muted-foreground">{request.consumer}</p>
                       <p className="text-sm">
-                        {order.product} - {order.quantity}
+                        {request.product} - {request.quantity}
                       </p>
+                      <p className="text-xs text-muted-foreground mt-1">{request.message}</p>
                     </div>
                     <div className="text-right">
-                      <p className="font-semibold text-primary">{order.amount}</p>
-                      {order.status === "pending" && (
-                        <div className="flex gap-2 mt-2">
-                          <Button size="sm" variant="outline" className="h-8 w-8 p-0 bg-transparent">
-                            <CheckCircle className="h-4 w-4 text-primary" />
-                          </Button>
-                          <Button size="sm" variant="outline" className="h-8 w-8 p-0 bg-transparent">
-                            <XCircle className="h-4 w-4 text-destructive" />
-                          </Button>
-                        </div>
-                      )}
+                      <div className="flex gap-2 mt-2">
+                        <Button size="sm" variant="outline" className="h-8 w-8 p-0 bg-transparent">
+                          <CheckCircle className="h-4 w-4 text-primary" />
+                        </Button>
+                        <Button size="sm" variant="outline" className="h-8 w-8 p-0 bg-transparent">
+                          <XCircle className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -145,13 +145,76 @@ export default function FarmerDashboard() {
             </CardContent>
           </Card>
 
-          {/* Product Management */}
+          {/* Recent Connections */}
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>Recent Connections</CardTitle>
+                  <CardDescription>Your latest consumer connections</CardDescription>
+                </div>
+                <Link href="/farmer/connections">
+                  <Button variant="outline" size="sm">
+                    View All
+                  </Button>
+                </Link>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {[
+                  { 
+                    consumer: "Priya Sharma", 
+                    connected: "2 days ago", 
+                    product: "Fresh Cow Milk",
+                    status: "active" 
+                  },
+                  { 
+                    consumer: "Amit Patel", 
+                    connected: "1 week ago", 
+                    product: "Pure Desi Ghee",
+                    status: "active" 
+                  },
+                  { 
+                    consumer: "Anjali Desai", 
+                    connected: "2 weeks ago", 
+                    product: "Homemade Paneer",
+                    status: "active" 
+                  },
+                ].map((connection, index) => (
+                  <div key={index} className="flex items-center justify-between p-4 border rounded-lg">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <p className="font-semibold">{connection.consumer}</p>
+                        <Badge variant={connection.status === "active" ? "default" : "secondary"} className="text-xs">
+                          {connection.status}
+                        </Badge>
+                      </div>
+                      <p className="text-sm text-muted-foreground">{connection.product}</p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Connected {connection.connected}
+                      </p>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button size="sm" variant="outline" className="h-8 w-8 p-0 bg-transparent">
+                        <UserPlus className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Product Management Section */}
+        <div className="mt-8">
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div>
                   <CardTitle>Your Products</CardTitle>
-                  <CardDescription>Manage your product listings</CardDescription>
+                  <CardDescription>Manage your product listings for consumer discovery</CardDescription>
                 </div>
                 <Link href="/farmer/products/add">
                   <Button size="sm" className="bg-[#80e619] hover:bg-[#80e619]/90">

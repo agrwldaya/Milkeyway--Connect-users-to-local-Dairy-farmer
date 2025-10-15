@@ -8,24 +8,50 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { MapPin, Star, Heart, Phone, Mail, Award, Truck, ShoppingCart, ChevronLeft, Loader2, AlertCircle } from "lucide-react"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { Textarea } from "@/components/ui/textarea"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { MapPin, Star, Heart, Phone, Mail, Award, Truck, ShoppingCart, ChevronLeft, Loader2, AlertCircle, MessageCircle, Send, CheckCircle } from "lucide-react"
 import { ConsumerNav } from "@/components/consumer-nav"
+import { toast } from "sonner"
+import { api } from "@/lib/utils"
 
 export default function FarmerProfilePage() {
   const params = useParams()
   const [farmer, setFarmer] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [requestDialogOpen, setRequestDialogOpen] = useState(false)
+  const [requestLoading, setRequestLoading] = useState(false)
+  const [requestSent, setRequestSent] = useState(false)
+  const [isConnected, setIsConnected] = useState(false)
+  const [connectionStatus, setConnectionStatus] = useState('not_connected') // 'not_connected', 'pending', 'connected'
+  const [requestForm, setRequestForm] = useState({
+    message: '',
+    contactMethod: 'phone',
+    preferredTime: '',
+    quantity: '',
+    productInterest: ''
+  })
 
+  // Check connection status
+   
   useEffect(() => {
     const fetchFarmerDetails = async () => {
       try {
         setLoading(true)
-        const response = await fetch(`/api/v1/consumers/farmer/${params.id}`)
-        const data = await response.json()
+        const response = await api.get(`/api/v1/consumers/farmer/${params.id}`)
+
+        const data = await response.data
+
+        console.log("Fetched farmer data:", data)
         
         if (data.success) {
           setFarmer(data.farmer)
+          // Check connection status after fetching farmer details
+          setConnectionStatus(data.farmer.existingConnectionStatus)
+          setIsConnected(data.farmer.existingConnectionStatus === 'connected')
         } else {
           setError(data.message || "Failed to fetch farmer details")
         }
@@ -41,6 +67,71 @@ export default function FarmerProfilePage() {
       fetchFarmerDetails()
     }
   }, [params.id])
+
+  // Handle request submission
+  const handleRequestSubmit = async (e) => {
+    e.preventDefault()
+    setRequestLoading(true)
+    
+    try {
+      console.log("Sending request with data:", {
+        farmerId: params.id,
+        ...requestForm
+      })
+      
+      const response = await fetch('http://localhost:4000/api/v1/connections/send-request', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include', // Include cookies for authentication
+        body: JSON.stringify({
+          farmerId: params.id,
+          ...requestForm
+        })
+      })
+      
+      console.log("Response status:", response.status)
+      
+      const data = await response.json()
+      
+      if (data.success) {
+        // Show success toast
+        toast.success("Request sent successfully!", {
+          description: "The farmer will contact you soon.",
+          duration: 4000,
+        })
+        
+        setRequestSent(true)
+        setRequestDialogOpen(false)
+        setConnectionStatus('pending') // Update status to pending
+        
+        // Reset form
+        setRequestForm({
+          message: '',
+          contactMethod: 'phone',
+          preferredTime: '',
+          quantity: '',
+          productInterest: ''
+        })
+      } else {
+        // Show error toast
+        toast.error("Failed to send request", {
+          description: data.message || 'Please try again later.',
+          duration: 4000,
+        })
+      }
+    } catch (err) {
+      console.error('Error sending request:', err)
+      // Show error toast
+      toast.error("Network error", {
+        description: 'Failed to send request. Please check your connection.',
+        duration: 4000,
+      })
+    } finally {
+      setRequestLoading(false)
+    }
+  }
 
   if (loading) {
     return (
@@ -107,9 +198,32 @@ export default function FarmerProfilePage() {
           </Button>
         </Link>
 
-        {/* Cover Image */}
-        <div className="relative h-64 rounded-2xl overflow-hidden mb-8 bg-gray-100">
-          <img src={farmer.coverImage || farmer.image || "/farmer.jpg"} alt={farmer.name} className="h-full w-full object-cover" />
+
+        {/* Farm and Farmer Images */}
+        <div className="grid md:grid-cols-2 gap-6 mb-8">
+          {/* Farm Image */}
+          <div className="relative h-64 rounded-2xl overflow-hidden bg-gray-100">
+            <img 
+              src={farmer.image || "/farm_cover.jpg"} 
+              alt={`${farmer.name} Farm`} 
+              className="h-full w-full object-cover" 
+            />
+            <div className="absolute bottom-4 left-4 bg-black/50 text-white px-3 py-1 rounded-full text-sm font-medium">
+              Farm
+            </div>
+          </div>
+          
+          {/* Farmer Image */}
+          <div className="relative h-64 rounded-2xl overflow-hidden bg-gray-100">
+            <img 
+              src={farmer.coverImage || "/farmer.jpg"} 
+              alt={`${farmer.owner} - Farmer`} 
+              className="h-full w-full object-cover" 
+            />
+            <div className="absolute bottom-4 left-4 bg-black/50 text-white px-3 py-1 rounded-full text-sm font-medium">
+              Farmer
+            </div>
+          </div>
         </div>
 
         {/* Farmer Info */}
@@ -185,33 +299,199 @@ export default function FarmerProfilePage() {
           <div>
             <Card className="bg-white sticky top-24">
               <CardContent className="p-6">
-                <h2 className="text-xl font-bold mb-6">Contact Information</h2>
+                <h2 className="text-xl font-bold mb-6">
+                  {isConnected ? "Contact Information" : "Connect with Farmer"}
+                </h2>
 
-                <div className="space-y-4 mb-6">
-                  <div className="flex items-center gap-3">
-                    <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
-                      <Phone className="h-5 w-5 text-primary" />
+                 {/* Connection Status */}
+                 {connectionStatus === 'pending' && (
+                   <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                     <div className="flex items-center gap-2 mb-2">
+                       <AlertCircle className="h-4 w-4 text-yellow-600" />
+                       <span className="font-medium text-yellow-800">Request does not accepted yet</span>
+                     </div>
+                     <p className="text-sm text-yellow-700">
+                       Your connection request is waiting for farmer approval.
+                     </p>
+                   </div>
+                 )}
+
+                {connectionStatus === 'connected' && (
+                  <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">
+                    <div className="flex items-center gap-2 mb-2">
+                      <CheckCircle className="h-4 w-4 text-green-600" />
+                      <span className="font-medium text-green-800">Connected</span>
                     </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">Phone</p>
-                      <p className="font-medium">{farmer.phone}</p>
+                    <p className="text-sm text-green-700">
+                      You are now connected! You can view contact details and communicate directly.
+                    </p>
+                  </div>
+                )}
+
+                {/* Contact Details - Only show if connected */}
+                {isConnected && (
+                  <div className="space-y-4 mb-6">
+                    <div className="flex items-center gap-3">
+                      <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+                        <Phone className="h-5 w-5 text-primary" />
+                      </div>
+                      <div>
+                        <p className="text-sm text-muted-foreground">Phone</p>
+                        <p className="font-medium">{farmer.phone}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+                        <Mail className="h-5 w-5 text-primary" />
+                      </div>
+                      <div>
+                        <p className="text-sm text-muted-foreground">Email</p>
+                        <p className="font-medium">{farmer.email}</p>
+                      </div>
                     </div>
                   </div>
-                  <div className="flex items-center gap-3">
-                    <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
-                      <Mail className="h-5 w-5 text-primary" />
+                )}
+
+                {/* Contact Details Hidden Message */}
+                {!isConnected && connectionStatus !== 'pending' && (
+                  <div className="mb-6 p-4 bg-gray-50 border border-gray-200 rounded-lg">
+                    <div className="flex items-center gap-2 mb-2">
+                      <AlertCircle className="h-4 w-4 text-gray-600" />
+                      <span className="font-medium text-gray-800">Contact Details Hidden</span>
                     </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">Email</p>
-                      <p className="font-medium">{farmer.email}</p>
-                    </div>
+                    <p className="text-sm text-gray-700">
+                      Send a connection request to view contact details and communicate directly with the farmer.
+                    </p>
                   </div>
+                )}
+
+                 <div className="space-y-3">
+                   {/* Show contact buttons only if connected */}
+                   {isConnected && (
+                     <>
+                       <Button size="lg" className="w-full bg-primary hover:bg-primary/90">
+                         <Phone className="h-5 w-5 mr-2" />
+                         Call Farmer
+                       </Button>
+                       <Button size="lg" variant="outline" className="w-full">
+                         <Mail className="h-5 w-5 mr-2" />
+                         Send Email
+                       </Button>
+                     </>
+                   )}
+                   
+                   {/* Show status button if request is pending */}
+                   {!isConnected && connectionStatus === 'pending' && (
+                     <Button size="lg" className="w-full bg-yellow-100 text-yellow-800 border border-yellow-300 cursor-not-allowed" disabled>
+                       <AlertCircle className="h-5 w-5 mr-2" />
+                       Request does not accepted yet
+                     </Button>
+                   )}
+                   
+                   {/* Show request button only if not connected and not pending */}
+                   {!isConnected && connectionStatus !== 'pending' && (
+                     <Dialog open={requestDialogOpen} onOpenChange={setRequestDialogOpen}>
+                       <DialogTrigger asChild>
+                         <Button size="lg" className="w-full bg-primary hover:bg-primary/90">
+                           <MessageCircle className="h-5 w-5 mr-2" />
+                           Send Connection Request
+                         </Button>
+                       </DialogTrigger>
+                    <DialogContent className="sm:max-w-md">
+                      <DialogHeader>
+                        <DialogTitle>Send Request to {farmer.name}</DialogTitle>
+                      </DialogHeader>
+                      
+                      <form onSubmit={handleRequestSubmit} className="space-y-4">
+                        <div>
+                          <Label htmlFor="productInterest">Product Interest</Label>
+                          <Input
+                            id="productInterest"
+                            placeholder="e.g., Fresh milk, Ghee, Paneer"
+                            value={requestForm.productInterest}
+                            onChange={(e) => setRequestForm({...requestForm, productInterest: e.target.value})}
+                            required
+                          />
+                        </div>
+                        
+                        <div>
+                          <Label htmlFor="quantity">Quantity Needed</Label>
+                          <Input
+                            id="quantity"
+                            placeholder="e.g., 2 liters, 1 kg"
+                            value={requestForm.quantity}
+                            onChange={(e) => setRequestForm({...requestForm, quantity: e.target.value})}
+                            required
+                          />
+                        </div>
+                        
+                        <div>
+                          <Label htmlFor="preferredTime">Preferred Time</Label>
+                          <Input
+                            id="preferredTime"
+                            placeholder="e.g., Morning, Evening, Anytime"
+                            value={requestForm.preferredTime}
+                            onChange={(e) => setRequestForm({...requestForm, preferredTime: e.target.value})}
+                          />
+                        </div>
+                        
+                        <div>
+                          <Label htmlFor="contactMethod">Preferred Contact Method</Label>
+                          <select
+                            id="contactMethod"
+                            className="w-full p-2 border rounded-md"
+                            value={requestForm.contactMethod}
+                            onChange={(e) => setRequestForm({...requestForm, contactMethod: e.target.value})}
+                          >
+                            <option value="phone">Phone Call</option>
+                            <option value="whatsapp">WhatsApp</option>
+                            <option value="email">Email</option>
+                          </select>
+                        </div>
+                        
+                        <div>
+                          <Label htmlFor="message">Additional Message</Label>
+                          <Textarea
+                            id="message"
+                            placeholder="Any specific requirements or questions..."
+                            value={requestForm.message}
+                            onChange={(e) => setRequestForm({...requestForm, message: e.target.value})}
+                            rows={3}
+                          />
+                        </div>
+                        
+                        <div className="flex gap-3">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => setRequestDialogOpen(false)}
+                            className="flex-1"
+                          >
+                            Cancel
+                          </Button>
+                          <Button
+                            type="submit"
+                            disabled={requestLoading}
+                            className="flex-1"
+                          >
+                            {requestLoading ? (
+                              <>
+                                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                Sending...
+                              </>
+                            ) : (
+                              <>
+                                <Send className="h-4 w-4 mr-2" />
+                                Send Request
+                              </>
+                            )}
+                          </Button>
+                        </div>
+                      </form>
+                    </DialogContent>
+                  </Dialog>
+                  )}
                 </div>
-
-                <Button size="lg" className="w-full bg-primary hover:bg-primary/90">
-                  <Phone className="h-5 w-5 mr-2" />
-                  Call Farmer
-                </Button>
               </CardContent>
             </Card>
           </div>

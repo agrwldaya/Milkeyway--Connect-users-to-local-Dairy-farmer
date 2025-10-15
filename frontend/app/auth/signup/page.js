@@ -51,7 +51,7 @@ export default function SignupPage() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-primary font-sans lg:flex-row">
+    <div className="min-h-screen flex flex-col   font-sans lg:flex-row">
     
       <div className="flex-1 flex items-center justify-center p-6 lg:p-12">
         <div className="w-full max-w-md">

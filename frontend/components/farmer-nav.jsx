@@ -12,9 +12,10 @@ import {
   Milk,
   LayoutDashboard,
   Package,
-  ShoppingCart,
+  Users,
+  MessageCircle,
+  Activity,
   User,
-  BarChart3,
   Settings,
   LogOut,
   Menu, // Import the Menu icon for the hamburger
@@ -37,7 +38,9 @@ export function FarmerNav() {
   const navItems = [
     { href: "/farmer/dashboard", icon: LayoutDashboard, label: "Dashboard" },
     { href: "/farmer/products", icon: Package, label: "Products" },
-    { href: "/farmer/orders", icon: ShoppingCart, label: "Orders" },
+    { href: "/farmer/requests", icon: MessageCircle, label: "Connection Requests" },
+    { href: "/farmer/connections", icon: Users, label: "My Connections" },
+    { href: "/farmer/activity", icon: Activity, label: "Activity" },
     { href: "/farmer/profile", icon: User, label: "Profile" },
     { href: "/farmer/settings", icon: Settings, label: "Settings" },
   ]

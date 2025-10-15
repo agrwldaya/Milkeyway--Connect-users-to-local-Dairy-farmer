@@ -5,6 +5,8 @@ import {
   loginConsumer,
   getNearbyFarmers,
   getFarmerDetails,
+  getCategories,
+  getFarmersByCategory,
 } from "../controllers/consumerController.js";
 import { verifyOtp } from "../controllers/autocontroller.js";
 import { authMiddleware } from "../middleware/authMiddleWare.js";
@@ -30,7 +32,17 @@ consumerRouter.post("/login", loginConsumer);
 consumerRouter.get("/nearby-farmers", getNearbyFarmers);
 
 // Get specific farmer details with products
-consumerRouter.get("/farmer/:farmerId", getFarmerDetails);
+consumerRouter.get("/farmer/:farmerId", authMiddleware, getFarmerDetails);
 
+ 
+
+// Get all categories
+consumerRouter.get("/categories", getCategories);
+
+// Get farmers by category
+consumerRouter.get("/farmers-by-category", getFarmersByCategory);
+
+// Note: Send request functionality moved to connectionController.js
+// Use: POST /api/v1/connections/send-request
 
 export default consumerRouter;

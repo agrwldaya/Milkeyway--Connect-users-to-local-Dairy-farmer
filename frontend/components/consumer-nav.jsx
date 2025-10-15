@@ -8,22 +8,25 @@ import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge"
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet" // Import Sheet components
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import {
   Milk,
   Search,
-  ShoppingCart,
-  Heart,
+  Users,
+  MessageCircle,
   User,
   LogOut,
-  Menu, // Import Menu icon for hamburger
+  Menu,
+  Bell,
+  Activity,
 } from "lucide-react"
 
 export function ConsumerNav() {
   const router = useRouter()
-  const [cartCount] = useState(3)
+  const [notificationCount] = useState(2) // Connection requests and activity
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [isConfirmOpen, setIsConfirmOpen] = useState(false)
+  
   const handleLogout = async () => {
     try {
       await api.post("/api/v1/auth/logout")
@@ -33,12 +36,13 @@ export function ConsumerNav() {
     }
   }
 
+  // Updated navigation items focused on connection platform
   const navItems = [
-    { href: "/consumer/dashboard", label: "Home" },
-    { href: "/consumer/browse", label: "Browse" },
-    { href: "/consumer/farmers", label: "Farmers" },
-    { href: "/consumer/orders", label: "My Orders" },
-    { href: "/consumer/favorites", label: "Favorites" },
+    { href: "/consumer/dashboard", label: "Discover Farmers", icon: Search },
+    { href: "/consumer/products", label: "Find by Product", icon: Milk },
+    { href: "/consumer/farmers", label: "All Farmers", icon: Users },
+    { href: "/consumer/connections", label: "My Connections", icon: MessageCircle },
+    { href: "/consumer/requests", label: "My Requests", icon: Activity },
   ]
 
   return (
@@ -53,15 +57,19 @@ export function ConsumerNav() {
 
         {/* Desktop Navigation */}
         <nav className="hidden md:flex items-center gap-6">
-          {navItems.map((item) => (
-            <Link
-              key={item.label}
-              href={item.href}
-              className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
-            >
-              {item.label}
-            </Link>
-          ))}
+          {navItems.map((item) => {
+            const IconComponent = item.icon
+            return (
+              <Link
+                key={item.label}
+                href={item.href}
+                className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <IconComponent className="h-4 w-4" />
+                {item.label}
+              </Link>
+            )
+          })}
         </nav>
 
         <div className="flex items-center gap-3">
@@ -82,16 +90,20 @@ export function ConsumerNav() {
                   </div>
                   <span className="font-serif text-xl font-bold text-foreground">Milkeyway</span>
                 </Link>
-                {navItems.map((item) => (
-                  <Link
-                    key={item.label}
-                    href={item.href}
-                    className="flex items-center gap-3 text-lg font-medium hover:text-primary transition-colors"
-                    onClick={() => setIsMobileMenuOpen(false)} // Close menu on item click
-                  >
-                    {item.label}
-                  </Link>
-                ))}
+                {navItems.map((item) => {
+                  const IconComponent = item.icon
+                  return (
+                    <Link
+                      key={item.label}
+                      href={item.href}
+                      className="flex items-center gap-3 text-lg font-medium hover:text-primary transition-colors"
+                      onClick={() => setIsMobileMenuOpen(false)}
+                    >
+                      <IconComponent className="h-5 w-5" />
+                      {item.label}
+                    </Link>
+                  )
+                })}
                 <div className="border-t pt-4 mt-4 flex flex-col gap-4">
                     <Link href="/consumer/profile" className="flex items-center gap-3 text-lg font-medium hover:text-primary transition-colors" onClick={() => setIsMobileMenuOpen(false)}>
                         <User className="h-5 w-5 text-muted-foreground" />
@@ -106,32 +118,30 @@ export function ConsumerNav() {
             </SheetContent>
           </Sheet>
 
-          {/* Action Icons (Search, Heart, Cart, User, Logout) */}
-          <Button variant="ghost" size="sm" className="hidden md:flex"> {/* Search on desktop */}
-            <Search className="h-4 w-4" />
-          </Button>
-          <Link href="/consumer/favorites" className="hidden md:block"> {/* Favorites on desktop */}
-            <Button variant="ghost" size="sm">
-              <Heart className="h-4 w-4" />
-            </Button>
-          </Link>
-
-          <Link href="/consumer/cart"> {/* Cart visible on all screens */}
+          {/* Action Icons - Connection Platform Focused */}
+          <Link href="/consumer/connections" className="hidden md:block">
             <Button variant="ghost" size="sm" className="relative">
-              <ShoppingCart className="h-4 w-4" />
-              {cartCount > 0 && (
-                <Badge className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-xs bg-secondary">
-                  {cartCount}
+              <MessageCircle className="h-4 w-4" />
+              {notificationCount > 0 && (
+                <Badge className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-xs bg-primary">
+                  {notificationCount}
                 </Badge>
               )}
             </Button>
           </Link>
 
-          <Link href="/consumer/profile" className="hidden md:block"> {/* Profile on desktop */}
+          <Link href="/consumer/requests" className="hidden md:block">
+            <Button variant="ghost" size="sm" className="relative">
+              <Activity className="h-4 w-4" />
+            </Button>
+          </Link>
+
+          <Link href="/consumer/profile" className="hidden md:block">
             <Button variant="ghost" size="sm">
               <User className="h-4 w-4" />
             </Button>
           </Link>
+          
           <Button variant="ghost" size="sm" onClick={() => setIsConfirmOpen(true)} className="hidden md:block">
             <LogOut className="h-4 w-4" />
           </Button>

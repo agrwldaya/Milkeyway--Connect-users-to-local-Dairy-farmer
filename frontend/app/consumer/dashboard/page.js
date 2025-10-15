@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-import { Search, MapPin, Star, Heart, Filter, Loader2, AlertCircle } from "lucide-react"
+import { Search, MapPin, Star, Users, MessageCircle, Filter, Loader2, AlertCircle, Activity, TrendingUp, Milk } from "lucide-react"
 import { ConsumerNav } from "@/components/consumer-nav"
 
 export default function ConsumerDashboard() {
@@ -88,9 +88,9 @@ export default function ConsumerDashboard() {
       <main className="container py-8 px-5">
         {/* Hero Search Section */}
         <div className="mb-12 text-center">
-          <h1 className="text-4xl md:text-5xl font-serif font-bold mb-4 text-balance">Discover Fresh Dairy Near You</h1>
+          <h1 className="text-4xl md:text-5xl font-serif font-bold mb-4 text-balance">Connect with Local Dairy Farmers</h1>
           <p className="text-lg text-muted-foreground mb-8 text-pretty max-w-2xl mx-auto">
-            Find authentic dairy products from trusted local farmers in your area
+            Discover and connect with trusted local farmers for fresh dairy products. Build direct relationships with your food producers.
           </p>
 
           {/* Location Request Section */}  
@@ -101,7 +101,7 @@ export default function ConsumerDashboard() {
                   <MapPin className="h-12 w-12 text-primary mx-auto mb-4" />
                   <h3 className="text-xl font-semibold mb-2">Enable Location Access</h3>
                   <p className="text-muted-foreground mb-4">
-                    Allow us to access your location to find nearby farmers and fresh dairy products
+                    Allow us to access your location to find nearby farmers and connect with them directly
                   </p>
                   <Button 
                     onClick={requestLocation} 
@@ -171,26 +171,86 @@ export default function ConsumerDashboard() {
           </div>
         </div>
 
-        {/* Categories */}
+        {/* Quick Stats */}
         <div className="mb-12">
-          <h2 className="text-2xl font-serif font-bold mb-6">Browse by Category</h2>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-            {[
-              { name: "Milk", icon: "🥛", count: 45 },
-              { name: "Ghee", icon: "🧈", count: 28 },
-              { name: "Paneer", icon: "🧀", count: 32 },
-              { name: "Curd", icon: "🥣", count: 38 },
-              { name: "Butter", icon: "🧈", count: 24 },
-              { name: "All Products", icon: "📦", count: 167 },
-            ].map((category) => (
-              <Card key={category.name} className="cursor-pointer hover:border-primary transition-colors">
+          <h2 className="text-2xl font-serif font-bold mb-6">Your Connection Overview</h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <Card className="p-6">
+              <div className="flex items-center gap-4">
+                <div className="p-3 bg-primary/10 rounded-full">
+                  <Users className="h-6 w-6 text-primary" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold">12</p>
+                  <p className="text-sm text-muted-foreground">Active Connections</p>
+                </div>
+              </div>
+            </Card>
+            <Card className="p-6">
+              <div className="flex items-center gap-4">
+                <div className="p-3 bg-green-100 rounded-full">
+                  <MessageCircle className="h-6 w-6 text-green-600" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold">8</p>
+                  <p className="text-sm text-muted-foreground">Pending Requests</p>
+                </div>
+              </div>
+            </Card>
+            <Card className="p-6">
+              <div className="flex items-center gap-4">
+                <div className="p-3 bg-blue-100 rounded-full">
+                  <Activity className="h-6 w-6 text-blue-600" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold">24</p>
+                  <p className="text-sm text-muted-foreground">Total Requests</p>
+                </div>
+              </div>
+            </Card>
+          </div>
+        </div>
+
+        {/* Quick Actions */}
+        <div className="mb-12">
+          <h2 className="text-2xl font-serif font-bold mb-6">Quick Actions</h2>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <Link href="/consumer/products">
+              <Card className="cursor-pointer hover:border-primary transition-colors">
                 <CardContent className="p-6 text-center">
-                  <div className="text-4xl mb-2">{category.icon}</div>
-                  <p className="font-semibold mb-1">{category.name}</p>
-                  <p className="text-xs text-muted-foreground">{category.count} products</p>
+                  <Milk className="h-8 w-8 text-orange-600 mx-auto mb-2" />
+                  <p className="font-semibold">Find by Product</p>
+                  <p className="text-xs text-muted-foreground">Search by specific products</p>
                 </CardContent>
               </Card>
-            ))}
+            </Link>
+            <Link href="/consumer/connections">
+              <Card className="cursor-pointer hover:border-primary transition-colors">
+                <CardContent className="p-6 text-center">
+                  <MessageCircle className="h-8 w-8 text-primary mx-auto mb-2" />
+                  <p className="font-semibold">My Connections</p>
+                  <p className="text-xs text-muted-foreground">View active connections</p>
+                </CardContent>
+              </Card>
+            </Link>
+            <Link href="/consumer/requests">
+              <Card className="cursor-pointer hover:border-primary transition-colors">
+                <CardContent className="p-6 text-center">
+                  <Activity className="h-8 w-8 text-green-600 mx-auto mb-2" />
+                  <p className="font-semibold">My Requests</p>
+                  <p className="text-xs text-muted-foreground">Track request status</p>
+                </CardContent>
+              </Card>
+            </Link>
+            <Link href="/consumer/farmers">
+              <Card className="cursor-pointer hover:border-primary transition-colors">
+                <CardContent className="p-6 text-center">
+                  <Users className="h-8 w-8 text-blue-600 mx-auto mb-2" />
+                  <p className="font-semibold">All Farmers</p>
+                  <p className="text-xs text-muted-foreground">Browse all farmers</p>
+                </CardContent>
+              </Card>
+            </Link>
           </div>
         </div>
 
@@ -248,7 +308,7 @@ export default function ConsumerDashboard() {
                       <Badge className="absolute top-4 left-4 bg-primary text-primary-foreground">✓ Verified</Badge>
                     )}
                     <Button size="sm" variant="secondary" className="absolute top-4 right-4 h-8 w-8 p-0 rounded-full">
-                      <Heart className="h-4 w-4" />
+                      <MessageCircle className="h-4 w-4" />
                     </Button>
                   </div>
                   <CardContent className="p-6">
@@ -270,7 +330,7 @@ export default function ConsumerDashboard() {
                     <p className="text-sm text-muted-foreground mb-4">{farmer.products} products available</p>
 
                     <Link href={`/consumer/farmer/${farmer.id}`}>
-                      <Button className="w-full bg-primary hover:bg-primary/90">View Products</Button>
+                      <Button className="w-full bg-primary hover:bg-primary/90">Connect with Farmer</Button>
                     </Link>
                   </CardContent>
                 </Card>

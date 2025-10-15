@@ -13,8 +13,12 @@ import {
   LayoutDashboard,
   Store,
   Users,
-  Package,
-  ShoppingCart,
+  MessageCircle,
+  Activity,
+  UserCheck,
+  TrendingUp,
+  Shield,
+  CheckCircle,
   Settings,
   LogOut,
   Menu, // Import the Menu icon for the hamburger
@@ -36,9 +40,12 @@ export function AdminNav() {
   const navItems = [
     { href: "/admin/dashboard", icon: LayoutDashboard, label: "Dashboard" },
     { href: "/admin/farmers", icon: Store, label: "Farmers" },
+    { href: "/admin/farmer-approvals", icon: Shield, label: "Farmer Approvals" },
     { href: "/admin/consumers", icon: Users, label: "Consumers" },
-    { href: "/admin/products", icon: Package, label: "Products" },
-    { href: "/admin/orders", icon: ShoppingCart, label: "Orders" },
+    { href: "/admin/connections", icon: UserCheck, label: "Connections" },
+    { href: "/admin/requests", icon: MessageCircle, label: "Requests" },
+    { href: "/admin/activity", icon: Activity, label: "Activity" },
+    { href: "/admin/analytics", icon: TrendingUp, label: "Analytics" },
   ]
 
   return (

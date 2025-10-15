@@ -3,6 +3,8 @@ import {
   getAllFarmers,
   getFarmerById,
   approveFarmer,
+  rejectFarmer,
+  getPendingFarmers,
   LoginAdmin,
 } from "../controllers/adminController.js";
 import { authMiddleware, verifyAdmin } from "../middleware/authMiddleWare.js";
@@ -17,11 +19,9 @@ AdminRouter.post("/login", LoginAdmin);
 AdminRouter.use(authMiddleware,verifyAdmin)
 
 AdminRouter.get("/farmers", getAllFarmers);
+AdminRouter.get("/farmers/pending", getPendingFarmers);
 AdminRouter.get("/farmers/:id", getFarmerById);
 AdminRouter.patch("/farmers/:id/approve", approveFarmer);
-
-// AdminRouter.patch("/farmers/:id/reject", rejectFarmer);
-// AdminRouter.patch("/farmers/:id/suspend", suspendFarmer);
-// AdminRouter.patch("/farmers/:id/reactivate", reactivateFarmer);
+AdminRouter.patch("/farmers/:id/reject", rejectFarmer);
 
 export default AdminRouter;

@@ -4,6 +4,7 @@ import { sendVerificationEmail } from "../utils/sendVerificationEmail.js";
 import { uploadFiles } from "../utils/fileupload.js";
 import crypto from "crypto";
 import { generateAccessToken, generateRefreshToken } from "../utils/jwtUtils.js";
+// Note: Activity tracking moved to connectionController.js
 
 
 // Register Consumer
@@ -411,13 +412,126 @@ export const getNearbyFarmers = async (req, res) => {
   }
 };
 
+// Get all categories
+export const getCategories = async (req, res) => {
+  try {
+    const query = `
+      SELECT id, name, imageurl 
+      FROM categories 
+      ORDER BY name ASC
+    `;
+    
+    const result = await pool.query(query);
+    
+    res.status(200).json({
+      success: true,
+      message: "Categories fetched successfully",
+      categories: result.rows
+    });
+    
+  } catch (error) {
+    console.error("Get Categories Error:", error);
+    res.status(500).json({ 
+      success: false, 
+      message: "Internal server error",
+      error: error.message 
+    });
+  }
+};
+
+// Get farmers by category
+export const getFarmersByCategory = async (req, res) => {
+  try {
+    const { categoryId, latitude, longitude, radius = 10 } = req.query;
+    
+    //console.log("Received query params:", { categoryId, latitude, longitude, radius });
+
+    if (!categoryId || !latitude || !longitude) {
+      console.log("Missing required parameters:", { categoryId, latitude, longitude });
+      return res.status(400).json({ 
+        success: false, 
+        message: "Category ID, latitude, and longitude are required" 
+      });
+    }
+
+    // Convert to numbers
+    const userLat = parseFloat(latitude);
+    const userLng = parseFloat(longitude);
+    const searchRadius = parseFloat(radius);
+
+    // Simple test query first
+    const query = `
+      SELECT 
+        f.id as farmer_id,
+        u.name as farmer_name,
+        f.farm_name,
+        f.address,
+        f.latitude,
+        f.longitude
+      FROM farmer_profiles f
+      JOIN users u ON f.user_id = u.id
+      JOIN products p ON f.id = p.farmer_id
+      WHERE f.status = 'approved'   
+        AND f.latitude IS NOT NULL 
+        AND f.longitude IS NOT NULL
+        AND p.is_available = true
+        AND p.category_id = $1
+      LIMIT 10
+    `;
+    
+
+    //console.log("Executing query with categoryId:", parseInt(categoryId));
+    const result = await pool.query(query, [parseInt(categoryId)]);
+    //console.log("Query result:", result.rows.length, "farmers found");
+
+    // Format the response
+    const farmers = result.rows.map(farmer => ({
+      id: farmer.farmer_id,
+      name: farmer.farm_name,
+      owner: farmer.farmer_name,
+      address: farmer.address,
+      latitude: farmer.latitude,
+      longitude: farmer.longitude,
+      description: "Fresh dairy products from a trusted local farmer.",
+      rating: 4.5, // Default rating
+      reviews: 0, // Default reviews
+      products: [], // Empty for now
+      distance: "0.0 km", // Default distance
+      verified: false, // Default
+      status: "approved"
+    }));
+
+    res.status(200).json({
+      success: true,
+      message: `Found ${farmers.length} farmers selling products in this category within ${searchRadius}km`,
+      farmers,
+      searchParams: {
+        categoryId,
+        latitude: userLat,
+        longitude: userLng,
+        radius: searchRadius
+      }
+    });
+
+  } catch (error) {
+    console.error("Get Farmers by Product Error:", error);
+    res.status(500).json({ 
+      success: false, 
+      message: "Internal server error",
+      error: error.message 
+    });
+  }
+};
+
 // Get farmer details with products
 export const getFarmerDetails = async (req, res) => {
   try {
     const { farmerId } = req.params;
+    const consumerId = req.user.user_id;
+     
 
-    if (!farmerId) {
-      return res.status(400).json({ message: "Farmer ID is required" });
+    if (!farmerId || !consumerId) {
+      return res.status(400).json({ message: "Farmer ID and consumer ID are required" });
     }
 
     // Get farmer profile
@@ -456,22 +570,22 @@ export const getFarmerDetails = async (req, res) => {
     const productsQuery = `
       SELECT 
         p.id,
-        p.product_name,
+        p.name,
         p.description,
-        p.price,
+        p.price_per_unit,
         p.unit,
         p.stock_quantity,
-        p.product_image,
-        c.category_name,
-        mc.milk_category_name
+        c.name as category_name
       FROM products p
       LEFT JOIN categories c ON p.category_id = c.id
-      LEFT JOIN milk_categories mc ON p.milk_category_id = mc.id
       WHERE p.farmer_id = $1
       ORDER BY p.created_at DESC
     `;
 
     const productsResult = await pool.query(productsQuery, [farmerId]);
+
+    const existingConnection = await pool.query("SELECT * FROM farmer_requests WHERE farmer_id = $1 AND consumer_id = $2", [farmerId, consumerId]);
+    const existingConnectionStatus = existingConnection.rows.length > 0 ? existingConnection.rows[0].status : null;
 
     // Format the response
     const farmerData = {
@@ -499,15 +613,14 @@ export const getFarmerDetails = async (req, res) => {
       } : null,
       products: productsResult.rows.map(product => ({
         id: product.id,
-        name: product.product_name,
+        name: product.name,
         description: product.description,
-        price: product.price,
+        price: product.price_per_unit,
         unit: product.unit,
         stock: product.stock_quantity,
-        image: product.product_image,
-        category: product.category_name,
-        milkCategory: product.milk_category_name
-      }))
+        category: product.category_name
+      })),
+      existingConnectionStatus
     };
 
     res.status(200).json({
@@ -524,5 +637,8 @@ export const getFarmerDetails = async (req, res) => {
     });
   }
 };
+
+// Note: sendRequestToFarmer function moved to connectionController.js
+// Use: POST /api/v1/connections/send-request
 
 
