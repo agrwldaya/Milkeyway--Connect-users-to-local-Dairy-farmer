@@ -1,18 +1,52 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Camera, MapPin, Phone, Mail } from "lucide-react"
+import { Camera, MapPin, Phone, Mail, Loader2, AlertCircle } from "lucide-react"
 import { ConsumerNav } from "@/components/consumer-nav"
+import { api } from "@/lib/utils"
+import { toast } from "sonner"
 
 export default function ProfilePage() {
   const [isEditing, setIsEditing] = useState(false)
+  const [consumerProfile, setConsumerProfile] = useState(null)
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState(null)
+  const API_BASE = process.env.NEXT_PUBLIC_API_URL || "localhost:4000"
 
+
+  useEffect(() => {
+    let active = true
+    const fetchConsumerProfile = async () => {
+      setIsLoading(true)
+      try {
+        const response = await api.get(`${API_BASE}/api/v1/consumers/profile`)
+        const data = await response.data
+        if(!data.consumerProfile) throw new Error(data.message || "Failed to load consumer profile")
+        if(!active) return
+        setConsumerProfile(data.consumerProfile)
+      } catch (err) {
+        toast.error(err?.response?.data?.message || err.message || "Failed to load consumer profile")
+        setError(err?.response?.data?.message || err.message || "Failed to load consumer profile")
+      } finally {
+        setIsLoading(false)
+      }
+    }
+    fetchConsumerProfile()
+    return () => {
+      active = false
+    }
+  }, [API_BASE])
+
+  if(isLoading) return <div className="flex justify-center items-center h-screen"><Loader2 className="w-10 h-10 animate-spin" /></div>
+  if(error) return <div className="flex justify-center items-center h-screen"><AlertCircle className="w-10 h-10 text-red-500" />{error}</div>
+  if(!consumerProfile) return <div className="flex justify-center items-center h-screen"><AlertCircle className="w-10 h-10 text-red-500" />Consumer profile not found</div>
+  
   return (
     <div className="min-h-screen bg-gray-50">
       <ConsumerNav />
@@ -26,7 +60,7 @@ export default function ProfilePage() {
             <CardContent className="p-6 text-center">
               <div className="relative inline-block mb-4">
                 <Avatar className="h-32 w-32">
-                  <AvatarImage src="/placeholder.svg" />
+                  <AvatarImage src={consumerProfile.image} />
                   <AvatarFallback className="text-2xl">PS</AvatarFallback>
                 </Avatar>
                 <Button
@@ -37,21 +71,21 @@ export default function ProfilePage() {
                 </Button>
               </div>
 
-              <h2 className="text-2xl font-bold mb-1">Priya Sharma</h2>
-              <p className="text-muted-foreground mb-6">Customer since Jan 2024</p>
+              <h2 className="text-2xl font-bold mb-1">{consumerProfile.name}</h2>
+              <p className="text-muted-foreground mb-6">Customer since {consumerProfile.createdAt.split("T")[0]}</p>
 
               <div className="space-y-3 text-sm">
                 <div className="flex items-center gap-2 text-muted-foreground">
                   <Mail className="h-4 w-4" />
-                  <span>priya.sharma@email.com</span>
+                  <span>{consumerProfile.email}</span>
                 </div>
                 <div className="flex items-center gap-2 text-muted-foreground">
                   <Phone className="h-4 w-4" />
-                  <span>+91 98765 43210</span>
+                  <span>{consumerProfile.phone}</span>
                 </div>
                 <div className="flex items-center gap-2 text-muted-foreground">
                   <MapPin className="h-4 w-4" />
-                  <span>Andheri, Mumbai</span>
+                  <span>{consumerProfile.address}</span>
                 </div>
               </div>
             </CardContent>
@@ -72,11 +106,11 @@ export default function ProfilePage() {
                   <div className="grid sm:grid-cols-2 gap-4">
                     <div>
                       <Label htmlFor="firstName">First Name</Label>
-                      <Input id="firstName" defaultValue="Priya" disabled={!isEditing} className="mt-1.5" />
+                      <Input id="firstName" defaultValue={consumerProfile.name.split(" ")[0]} disabled={!isEditing} className="mt-1.5" />
                     </div>
                     <div>
                       <Label htmlFor="lastName">Last Name</Label>
-                      <Input id="lastName" defaultValue="Sharma" disabled={!isEditing} className="mt-1.5" />
+                      <Input id="lastName" defaultValue={consumerProfile.name.split(" ")[1]} disabled={!isEditing} className="mt-1.5" />
                     </div>
                   </div>
 
@@ -85,7 +119,7 @@ export default function ProfilePage() {
                     <Input
                       id="email"
                       type="email"
-                      defaultValue="priya.sharma@email.com"
+                      defaultValue={consumerProfile.email}
                       disabled={!isEditing}
                       className="mt-1.5"
                     />
@@ -96,7 +130,7 @@ export default function ProfilePage() {
                     <Input
                       id="phone"
                       type="tel"
-                      defaultValue="+91 98765 43210"
+                      defaultValue={consumerProfile.phone}
                       disabled={!isEditing}
                       className="mt-1.5"
                     />
@@ -114,7 +148,7 @@ export default function ProfilePage() {
                     <Label htmlFor="address">Street Address</Label>
                     <Textarea
                       id="address"
-                      defaultValue="Flat 301, Green Heights, Andheri West"
+                      defaultValue={consumerProfile.address}
                       disabled={!isEditing}
                       className="mt-1.5"
                       rows={3}
@@ -124,19 +158,19 @@ export default function ProfilePage() {
                   <div className="grid sm:grid-cols-2 gap-4">
                     <div>
                       <Label htmlFor="city">City</Label>
-                      <Input id="city" defaultValue="Mumbai" disabled={!isEditing} className="mt-1.5" />
+                      <Input id="city" defaultValue={consumerProfile.city} disabled={!isEditing} className="mt-1.5" />
                     </div>
                     <div>
                       <Label htmlFor="pincode">Pincode</Label>
-                      <Input id="pincode" defaultValue="400053" disabled={!isEditing} className="mt-1.5" />
+                      <Input id="pincode" defaultValue={consumerProfile.pincode} disabled={!isEditing} className="mt-1.5" />
                     </div>
                   </div>
 
                   <div>
                     <Label htmlFor="landmark">Landmark (Optional)</Label>
-                    <Input id="landmark" defaultValue="Near Metro Station" disabled={!isEditing} className="mt-1.5" />
+                      <Input id="landmark" defaultValue={consumerProfile.landmark} disabled={!isEditing} className="mt-1.5" />
                   </div>
-                </div>
+                </div>  
               </CardContent>
             </Card>
 

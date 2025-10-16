@@ -10,13 +10,13 @@ import { generateAccessToken, generateRefreshToken } from "../utils/jwtUtils.js"
 // Register Consumer
 export const registerConsumer = async (req, res) => {
   try {
-    const { name, email, phone, password } = req.body;
+    const { name, email, phone, password,pincode,country,state,city} = req.body;
 
     // Validate input
-    if (!name || !email || !phone || !password) {
+    if (!name || !email || !phone || !password || !pincode || !country || !state || !city) {
       return res
         .status(400)
-        .json({ message: "Name, email, phone and password are required" });
+        .json({ message: "Name, email, phone, password, pincode, country, state and city are required" });
     }
 
     // Check if email/phone already exists
@@ -42,17 +42,17 @@ export const registerConsumer = async (req, res) => {
 if (existing.rows.length > 0 && !existing.rows[0].is_verified) {
   await pool.query(
     `UPDATE users 
-     SET name=$1, email=$2, phone=$3, password=$4, role=$5, status=$6 
+     SET name=$1, email=$2, phone=$3, password=$4, role=$5, status=$6, pincode=$7, country=$8, state=$9, city=$10 
      WHERE id=$7`,
-    [name, email, phone, hashedPassword, "consumer", "draft", existing.rows[0].id]
+    [name, email, phone, hashedPassword, "consumer", "draft", existing.rows[0].id, pincode, country, state, city]
   );
   consumerId = existing.rows[0].id;
 } else {
   const insertResult = await pool.query(
-    `INSERT INTO users (name, email, phone, password, role, status) 
-     VALUES ($1, $2, $3, $4, $5, $6) 
-     RETURNING id, name, email, phone, role, status, created_at`,
-    [name, email, phone, hashedPassword, "consumer", "draft"]
+    `INSERT INTO users (name, email, phone, password, role, status, pincode, country, state, city) 
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) 
+     RETURNING id, name, email, phone, role, status, pincode, country, state, city, created_at`,
+    [name, email, phone, hashedPassword, "consumer", "draft", pincode, country, state, city]
   );
   consumerId = insertResult.rows[0].id;
 }
@@ -147,7 +147,7 @@ export const completeConsumerProfile = async (req, res) => {
       secure: process.env.NODE_ENV === "production",
       sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
       path: "/",
-      maxAge: 15 * 60 * 1000, // 15 min
+      maxAge: 60 * 60 * 1000, // 1 hour
     });
 
     // Set refresh token cookie (long-lived, scoped to refresh endpoint)
@@ -174,65 +174,6 @@ export const completeConsumerProfile = async (req, res) => {
     res.status(500).json({ message: "Internal server error" });
   }
 };
-// Upload Consumer Documents
-// export const uploadDocuments = async (req, res) => {
-//   try {
-//     const { user_id } = req.params;
-
-    
-//    //console.log(req.files);
-
-//     if (!user_id) {
-//       return res.status(400).json({ success: false, message: "User ID is required" });
-//     }
-//     // Check if farmer exists
-//     const user = await pool.query("SELECT * FROM users WHERE id = $1 AND role = $2", [user_id, "farmer"]);
-//     if (user.rows.length === 0) {
-//       return res.status(404).json({ success: false, message: "user not found" });
-//     }
-
-//     const farmer = await pool.query("SELECT * FROM farmer_profiles WHERE user_id=$1", [user_id]);
-//     if (farmer.rows.length === 0) {
-//       return res.status(404).json({ success: false, message: "Farmer profile not found" });
-//     }
-//     const farmer_id = farmer.rows[0].id;
-
-//     // Check if files exist
-//     if (!req.files || !req.files.farmer_doc) {
-//       return res.status(400).json({ success: false, message: "No documents uploaded" });
-//     }
-
-//     // Upload files to Cloudinary
-//     const { uploadedUrls, errors } = await uploadFiles(req.files,"farmer_doc" );
-//     console.log("Uploaded URLs:", uploadedUrls);
-
-//     let doc_type = 'unknown'; 
-//     // Save file URLs into farmer_documents table
-//     if (uploadedUrls.length > 0) {
-//        doc_type = uploadedUrls.length > 0 ? uploadedUrls[0].split('.').pop() :'unknown';
-
-//       const insertQuery = `
-//         INSERT INTO documents (farmer_id, file_url, uploaded_at, doc_type)
-//         VALUES ($1, $2, NOW(), $3)
-//         RETURNING *;
-//       `;
-
-//       for (const url of uploadedUrls) {
-//         await pool.query(insertQuery, [farmer_id, url,  doc_type]);
-//       }
-//     }
-
-//     return res.status(200).json({
-//       success: true,
-//       message: "Documents processed",
-//       uploaded: uploadedUrls,
-//       doc_type
-//     });
-//   } catch (error) {
-//     console.error("Upload Documents Error:", error);
-//     res.status(500).json({ success: false, message: "Internal server error" });
-//   }
-// };
 
 // Consumer Login
 export const loginConsumer = async (req, res) => {
@@ -638,7 +579,48 @@ export const getFarmerDetails = async (req, res) => {
   }
 };
 
-// Note: sendRequestToFarmer function moved to connectionController.js
-// Use: POST /api/v1/connections/send-request
+// get consumer profile
+export const getConsumerProfile = async (req, res) => {
+  try {
+    const consumerId = req.user.user_id;
+    if(!consumerId) {
+      return res.status(400).json({ message: "Consumer ID is required" });
+    }
 
+    const user = await pool.query("SELECT * FROM users WHERE id = $1 AND role = $2", [consumerId, "consumer"]);
 
+    if (user.rows.length === 0) {
+      return res.status(404).json({ message: "Consumer not found" });
+    }
+    const consumerProfile = await pool.query("SELECT * FROM consumer_profiles WHERE user_id = $1", [consumerId]);
+    if (consumerProfile.rows.length === 0) {
+      return res.status(404).json({ message: "Consumer profile not found" });
+    }
+    const response = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${consumerProfile.rows[0].latitude}&lon=${consumerProfile.rows[0].longitude}&format=json`);
+    const data = await response.json();
+
+    console.log(data);
+    const consumerProfileData = {
+      name: user.rows[0].name,
+      email: user.rows[0].email,
+      phone: user.rows[0].phone,
+      address: data.display_name,
+      latitude: consumerProfile.rows[0].latitude,
+      longitude: consumerProfile.rows[0].longitude,
+      image: consumerProfile.rows[0].profile_image_url,
+      preferredRadius: consumerProfile.rows[0].preferred_radius_km,
+      status: user.rows[0].status,
+      country: user.rows[0].country || data.address.country || null,
+      state: user.rows[0].state || data.address.state || null,
+      city: user.rows[0].city || data.address.state_district || null,
+      pincode: user.rows[0].pincode || data.address.postcode || null,
+      landmark: consumerProfile.rows[0].landmark || null,
+      createdAt: user.rows[0].created_at
+    };
+
+    res.status(200).json({ message: "Consumer profile fetched successfully", consumerProfile: consumerProfileData });
+  } catch (error) {
+    console.error("Get Consumer Profile Error:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};

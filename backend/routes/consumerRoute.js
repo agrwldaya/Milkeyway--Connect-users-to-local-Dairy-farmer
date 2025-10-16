@@ -7,6 +7,7 @@ import {
   getFarmerDetails,
   getCategories,
   getFarmersByCategory,
+  getConsumerProfile,
 } from "../controllers/consumerController.js";
 import { verifyOtp } from "../controllers/autocontroller.js";
 import { authMiddleware } from "../middleware/authMiddleWare.js";
@@ -42,7 +43,7 @@ consumerRouter.get("/categories", getCategories);
 // Get farmers by category
 consumerRouter.get("/farmers-by-category", getFarmersByCategory);
 
-// Note: Send request functionality moved to connectionController.js
-// Use: POST /api/v1/connections/send-request
+// Get consumer profile
+consumerRouter.get("/profile", authMiddleware, getConsumerProfile);
 
 export default consumerRouter;

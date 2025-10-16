@@ -26,6 +26,10 @@ export default function SignupPage() {
     password: "",
     confirmPassword: "",
     farmName: "",
+    pincode: "",
+    country: "",
+    state: "",
+    city: "",
     address: "",
     location: "",
     deliveryRadius: "",
@@ -39,7 +43,8 @@ export default function SignupPage() {
     }
   }
 
-  const handleSubmit = () => {
+  const handleSubmit = (e) => {
+    e.preventDefault()
     setIsLoading(true)
     setTimeout(() => {
       if (role === "farmer") {

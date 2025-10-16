@@ -11,13 +11,13 @@ import { generateAccessToken, generateRefreshToken } from "../utils/jwtUtils.js"
 // Register Farmer
 export const registerFarmer = async (req, res) => {
   try {
-    const { name, email, phone, password } = req.body;
+    const { name, email, phone, password,pincode,country,state,city} = req.body;
 
     // Validate input
-    if (!name || !email || !phone || !password) {
+    if (!name || !email || !phone || !password || !pincode || !country || !state || !city) {
       return res
         .status(400)
-        .json({ message: "Name, email, phone and password are required" });
+        .json({ message: "Name, email, phone, password, pincode, country, state and city are required" });
     }
 
     // Check if email/phone already exists
@@ -43,17 +43,17 @@ export const registerFarmer = async (req, res) => {
 if (existing.rows.length > 0 && !existing.rows[0].is_verified) {
   await pool.query(
     `UPDATE users 
-     SET name=$1, email=$2, phone=$3, password=$4, role=$5, status=$6 
+     SET name=$1, email=$2, phone=$3, password=$4, role=$5, status=$6, pincode=$7, country=$8, state=$9, city=$10 
      WHERE id=$7`,
-    [name, email, phone, hashedPassword, "farmer", "draft", existing.rows[0].id]
+    [name, email, phone, hashedPassword, "farmer", "draft", existing.rows[0].id, pincode, country, state, city]
   );
   farmerId = existing.rows[0].id;
 } else {
   const insertResult = await pool.query(
-    `INSERT INTO users (name, email, phone, password, role, status) 
-     VALUES ($1, $2, $3, $4, $5, $6) 
-     RETURNING id, name, email, phone, role, status, created_at`,
-    [name, email, phone, hashedPassword, "farmer", "draft"]
+    `INSERT INTO users (name, email, phone, password, role, status, pincode, country, state, city) 
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) 
+     RETURNING id, name, email, phone, role, status, pincode, country, state, city, created_at`,
+    [name, email, phone, hashedPassword, "farmer", "draft", pincode, country, state, city]
   );
   farmerId = insertResult.rows[0].id;
 }

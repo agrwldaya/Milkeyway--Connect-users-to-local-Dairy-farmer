@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -16,11 +16,28 @@ export default function FarmerSignup({ formData, setFormData, step, setStep, onB
   const [subStep, setSubStep] = useState(step === 2 ? "basic" : "farm") // basic -> otp -> farm -> docs
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [userId, setUserId] = useState(null)
+  const [pincode, setPincode] = useState("")
+  const [country, setCountry] = useState("")
+  const [state, setState] = useState("")
+  const [city, setCity] = useState("")
+  
+  useEffect(() => {
+    const getAddress = async () => {
+      const res = await fetch(`https://api.postalpincode.in/pincode/${pincode}`)
+      const data = await res.json()
+      setCountry(data[0].PostOffice[0].Country)
+      setState(data[0].PostOffice[0].State)
+      setCity(data[0].PostOffice[0].Name)
+    }
+    getAddress()
+  }, [pincode])
+  
+  
   const [otp, setOtp] = useState("")
   const [coords, setCoords] = useState({ latitude: "", longitude: "" })
 
   const handleRegister = async () => {
-    if (!formData.name || !formData.email || !formData.phone || !formData.password || !formData.confirmPassword) {
+    if (!formData.name || !formData.email || !formData.phone || !formData.password || !formData.confirmPassword || !pincode || !country || !state || !city) {
       toast.error("Please fill in all required fields")
       return
     }
@@ -44,6 +61,10 @@ export default function FarmerSignup({ formData, setFormData, step, setStep, onB
           email: formData.email,
           phone: formData.phone,
           password: formData.password,
+          pincode: pincode,
+          country: country,
+          state: state,
+          city: city,
         }),
       })
       const data = await res.json()
@@ -167,27 +188,48 @@ export default function FarmerSignup({ formData, setFormData, step, setStep, onB
       <div className="space-y-4">
         <div className="space-y-2">
           <Label htmlFor="name">Full Name</Label>
-          <Input id="name" placeholder="John Doe" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} required />
+            <Input id="name" placeholder="Enter your name" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} required />
         </div>
         <div className="space-y-2">
           <Label htmlFor="email">Email</Label>
-          <Input id="email" type="email" placeholder="you@example.com" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} required />
+          <Input id="email" type="email" placeholder="Enter your email" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} required />
         </div>
         <div className="space-y-2">
           <Label htmlFor="phone">Phone Number</Label>
-          <Input id="phone" type="tel" placeholder="+91 98765 43210" value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} required />
+          <Input id="phone" type="tel" placeholder="Enter your phone number" value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} required />
         </div>
         <div className="space-y-2">
           <Label htmlFor="password">Password</Label>
-          <Input id="password" type="password" placeholder="••••••••" value={formData.password} onChange={(e) => setFormData({ ...formData, password: e.target.value })} required />
+          <Input id="password" type="password" placeholder="Enter your password" value={formData.password} onChange={(e) => setFormData({ ...formData, password: e.target.value })} required />
         </div>
         <div className="space-y-2">
           <Label htmlFor="confirmPassword">Confirm Password</Label>
-          <Input id="confirmPassword" type="password" placeholder="••••••••" value={formData.confirmPassword} onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })} required />
+          <Input id="confirmPassword" type="password" placeholder="Confirm your password" value={formData.confirmPassword} onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })} required />
         </div>
+        <div className="flex gap-2">
+        <div className="space-y-2">
+          <Label htmlFor="pincode">Pincode</Label>
+          <Input id="pincode" type="number" placeholder="Enter your pincode" value={pincode} onChange={(e) => setPincode(e.target.value)} required />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="city">City</Label>
+          <Input id="city" type="text" placeholder="Enter your city" value={city} onChange={(e) => setCity(e.target.value)} required />
+        </div>
+        </div>
+        <div className="flex gap-2">
+        <div className="space-y-2">
+          <Label htmlFor="country">Country</Label>
+          <Input id="country" type="text" placeholder="Enter your country" value={country} onChange={(e) => setCountry(e.target.value)} required />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="state">State</Label>
+          <Input id="state" type="text" placeholder="Enter your state" value={state} onChange={(e) => setState(e.target.value)} required />
+        </div>
+        </div>
+
         <div className="flex gap-3">
           <Button type="button" variant="outline" onClick={onBack} className="flex-1">Back</Button>
-          <Button onClick={handleRegister} className="flex-1 bg-[#80e619] hover:bg-[#80e619]/90" disabled={isSubmitting}>{isSubmitting ? "Submitting..." : "Continue"}</Button>
+          <Button onClick={handleRegister} className="flex-1 bg-[#80e619] hover:bg-[#80e619]/90" disabled={isSubmitting}>{isSubmitting ? "Submitting..." : "Create Account"}</Button>
         </div>
       </div>
     )

@@ -178,7 +178,7 @@ export default function FarmerApprovalsPage() {
                   <Shield className="h-5 w-5 text-yellow-600" />
                 </div>
                 <div>
-                  <p className="text-2xl font-bold text-gray-900">{farmers.filter(f => f.profile.status === 'pending').length}</p>
+                  <p className="text-2xl font-bold text-gray-900">{farmers.filter(f => f.profile.status === 'draft' || f.profile.status === 'pending').length}</p>
                   <p className="text-sm text-muted-foreground">Pending Approval</p>
                 </div>
               </div>
