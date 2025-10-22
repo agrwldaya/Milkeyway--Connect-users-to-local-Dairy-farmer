@@ -6,7 +6,6 @@ import crypto from "crypto";
 import { generateAccessToken, generateRefreshToken } from "../utils/jwtUtils.js";
 // Note: Activity tracking moved to connectionController.js
 
-
 // Register Consumer
 export const registerConsumer = async (req, res) => {
   try {
