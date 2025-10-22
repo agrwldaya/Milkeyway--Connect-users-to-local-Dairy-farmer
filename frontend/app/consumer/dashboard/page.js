@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Search, MapPin, Star, Users, MessageCircle, Filter, Loader2, AlertCircle, Activity, TrendingUp, Milk } from "lucide-react"
 import { ConsumerNav } from "@/components/consumer-nav"
+import { api } from "@/lib/utils"
 
 export default function ConsumerDashboard() {
   const [searchQuery, setSearchQuery] = useState("")
@@ -16,6 +17,9 @@ export default function ConsumerDashboard() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [locationPermission, setLocationPermission] = useState(null)
+  const [consumerConnectionData, setConsumerConnectionData] = useState(null)
+
+  //console.log(consumerConnectionData)
 
   // Request user location
   const requestLocation = async () => {
@@ -28,6 +32,7 @@ export default function ConsumerDashboard() {
     setError(null)
 
     navigator.geolocation.getCurrentPosition(
+      
       async (position) => {
         const { latitude, longitude } = position.coords
         setLocation({ latitude, longitude })
@@ -68,6 +73,19 @@ export default function ConsumerDashboard() {
     }
   }
   
+  // Fetch consumer connection data from API
+  const fetchConsumerConnectionData = async () => {
+    try {
+      const response = await api.get(`/api/v1/consumers/connection-data`)
+      const data = await response.data
+      
+     // console.log(data)
+      setConsumerConnectionData(data.connectionData)
+    } catch (err) {
+      console.error("Error fetching consumer connection data:", err)
+      setError("Failed to fetch consumer connection data")
+    }
+  }
   // Check if location permission was previously granted
   useEffect(() => {
     if (navigator.permissions) {
@@ -78,6 +96,7 @@ export default function ConsumerDashboard() {
         }
       })
     }
+    fetchConsumerConnectionData()
   }, [])
 
   
@@ -181,7 +200,7 @@ export default function ConsumerDashboard() {
                   <Users className="h-6 w-6 text-primary" />
                 </div>
                 <div>
-                  <p className="text-2xl font-bold">12</p>
+                  <p className="text-2xl font-bold">{consumerConnectionData?.totalActiveConnections || 0}</p>
                   <p className="text-sm text-muted-foreground">Active Connections</p>
                 </div>
               </div>
@@ -192,7 +211,7 @@ export default function ConsumerDashboard() {
                   <MessageCircle className="h-6 w-6 text-green-600" />
                 </div>
                 <div>
-                  <p className="text-2xl font-bold">8</p>
+                  <p className="text-2xl font-bold">{consumerConnectionData?.totalPendingRequests || 0}</p>
                   <p className="text-sm text-muted-foreground">Pending Requests</p>
                 </div>
               </div>
@@ -203,7 +222,7 @@ export default function ConsumerDashboard() {
                   <Activity className="h-6 w-6 text-blue-600" />
                 </div>
                 <div>
-                  <p className="text-2xl font-bold">24</p>
+                  <p className="text-2xl font-bold">{consumerConnectionData?.totalRequests || 0}</p>
                   <p className="text-sm text-muted-foreground">Total Requests</p>
                 </div>
               </div>
@@ -295,7 +314,7 @@ export default function ConsumerDashboard() {
           )}
 
           {!loading && nearbyFarmers.length > 0 && (
-            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
               {nearbyFarmers.map((farmer) => (
                 <Card key={farmer.id} className="overflow-hidden hover:shadow-lg transition-shadow">
                   <div className="relative aspect-video overflow-hidden bg-muted">

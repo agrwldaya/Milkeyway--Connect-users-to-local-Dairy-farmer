@@ -281,7 +281,7 @@ export const loginFarmer = async (req, res) => {
       secure: process.env.NODE_ENV === "production",
       sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
       path: "/",
-      maxAge: 60 * 60 * 1000, // 60 min
+      maxAge: 2 * 60 * 60 * 1000, // 2 hours
     });
 
     // Set refresh token cookie (long-lived, scoped to refresh endpoint)
@@ -620,6 +620,137 @@ export const updateFarmerImage = async (req, res) => {
     res.status(500).json({ message: "Internal server error" });
   }
 }
+// Get farmer dashboard data
+export const getFarmerDashboardData = async (req, res) => {
+  try {
+    const userId = req.user.user_id;
+
+    // Get farmer profile ID
+    const user = await pool.query(
+      "SELECT * FROM users WHERE id = $1",
+      [userId]
+    );
+    const userInfo = user.rows[0];
+
+    if (user.rows.length === 0) {
+      return res.status(404).json({ 
+        success: false, 
+        message: "User not found" 
+      });
+    }
+    const farmer  = await pool.query("SELECT * FROM farmer_profiles WHERE user_id = $1", [userId]);
+    if (farmer.rows.length === 0) {
+      return res.status(404).json({ 
+        success: false, 
+        message: "Farmer profile not found" 
+      });
+    }
+    const farmerId = farmer.rows[0].id;
+    // Get farmer basic info
+    const farmerInfo = farmer.rows[0];
+
+    // Get total products count
+    const productsCount = await pool.query(
+      "SELECT COUNT(*) as count FROM products WHERE farmer_id = $1",
+      [farmerId]
+    );
+
+    // Get active connections count
+    const connectionsCount = await pool.query(
+      "SELECT COUNT(*) as count FROM active_connections WHERE farmer_id = $1 AND is_active = true",
+      [farmerId]
+    );
+
+    // Get pending requests count (using connection requests instead)
+    const pendingRequestsCount = await pool.query(
+      "SELECT COUNT(*) as count FROM farmer_requests WHERE farmer_id = $1 AND status = 'pending'",
+      [farmerId]
+    );
+
+    
+    const profileViews = farmer.rows[0].profile_views;
+
+    // Get recent connection requests (last 5)
+    const recentRequests = await pool.query(`
+      SELECT 
+        cr.id,
+        cr.product_interest,
+        cr.quantity,
+        cr.message,
+        cr.status,
+        cr.created_at,
+        u.name as consumer_name,
+        u.email as consumer_email,
+        u.phone as consumer_phone
+      FROM farmer_requests cr
+      JOIN users u ON cr.consumer_id = u.id
+      WHERE cr.farmer_id = $1
+      ORDER BY cr.created_at DESC
+      LIMIT 5
+    `, [farmerId]);
+
+    // Get recent connections (last 5)
+    const recentConnections = await pool.query(`
+      SELECT 
+        ac.id as connection_id,
+        ac.connected_at,
+        ac.connection_notes,
+        u.name as consumer_name,
+        u.email as consumer_email,
+        u.phone as consumer_phone
+      FROM active_connections ac
+      JOIN users u ON ac.consumer_id = u.id
+      WHERE ac.farmer_id = $1 AND ac.is_active = true
+      ORDER BY ac.connected_at DESC
+      LIMIT 5
+    `, [farmerId]);
+
+    // Get farmer's products
+    const products = await pool.query(`
+      SELECT 
+        p.id,
+        p.name,
+        p.price_per_unit,
+        p.unit,
+        p.stock_quantity,
+        p.is_available,
+        c.name as category_name,
+        c.imageurl as category_image
+      FROM products p
+      LEFT JOIN categories c ON p.category_id = c.id
+      WHERE p.farmer_id = $1
+      ORDER BY p.created_at DESC
+      LIMIT 10
+    `, [farmerId]);
+
+    const analytics = farmer.rows[0].analytics;
+
+    res.status(200).json({
+      success: true,
+      data: {
+        farmer: {...farmerInfo, name: userInfo.name},
+        stats: {
+          totalProducts: parseInt(productsCount.rows[0].count),
+          activeConnections: parseInt(connectionsCount.rows[0].count),
+          pendingRequests: parseInt(pendingRequestsCount.rows[0].count),
+          profileViews: parseInt(profileViews) || 0
+        },
+        recentRequests: recentRequests.rows,
+        recentConnections: recentConnections.rows,
+        products: products.rows,
+        analytics: analytics
+      }
+    });
+
+  } catch (error) {
+    console.error("Get Farmer Dashboard Data Error:", error);
+    res.status(500).json({ 
+      success: false, 
+      message: "Internal server error" 
+    });
+  }
+};
+
 export const updateFarmCover = async (req, res) => {
   try {
     const userId = req.user?.user_id || req.body.userId; // prefer auth middleware

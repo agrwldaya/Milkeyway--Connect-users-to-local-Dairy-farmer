@@ -147,7 +147,7 @@ export default function FarmerApprovalsPage() {
     return (
       <div className="min-h-screen bg-gray-50">
         <AdminNav />
-        <main className="container py-8">
+        <main className="container py-8 px-4 sm:px-5">
           <Card className="p-8 text-center">
             <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
             <h2 className="text-xl font-semibold mb-2">Error Loading Farmers</h2>
@@ -163,7 +163,7 @@ export default function FarmerApprovalsPage() {
     <div className="min-h-screen bg-gray-50">
       <AdminNav />
       
-      <main className="container py-8">
+      <main className="container py-4 sm:py-6 lg:py-8 px-4 sm:px-5">
         <div className="mb-6 sm:mb-8">
           <h1 className="text-2xl sm:text-3xl lg:text-4xl font-serif font-bold mb-2">Farmer Approvals</h1>
           <p className="text-sm sm:text-base text-muted-foreground">Review and approve farmer applications</p>

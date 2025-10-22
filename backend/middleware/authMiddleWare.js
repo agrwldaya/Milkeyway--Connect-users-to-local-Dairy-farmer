@@ -52,3 +52,33 @@ export const verifyAdmin = (req, res, next) => {
   next();
 };
 
+export const verifyFarmer = (req, res, next) => {
+  if (req.user.role !== "farmer") {
+    return res.status(403).json({
+      success: false,
+      message: "Access denied — Farmers only",
+    });
+  }
+  next();
+};
+
+export const verifyConsumer = (req, res, next) => {
+  if (req.user.role !== "consumer") {
+    return res.status(403).json({
+      success: false,
+      message: "Access denied — Consumers only",
+    });
+  }
+  next();
+};
+
+export const verifyFarmerOrConsumer = (req, res, next) => {
+  if (req.user.role !== "farmer" && req.user.role !== "consumer") {
+    return res.status(403).json({
+      success: false,
+      message: "Access denied — Farmers or Consumers only",
+    });
+  }
+  next();
+};
+

@@ -156,10 +156,10 @@ export default function FarmerRequestsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen">
       <FarmerNav />
 
-      <main className="container py-8">
+      <main className="container py-8 px-5">
         <div className="mb-6 sm:mb-8">
           <h1 className="text-2xl sm:text-3xl lg:text-4xl font-serif font-bold mb-2">Connection Requests</h1>
           <p className="text-sm sm:text-base text-muted-foreground">Manage consumer connection requests</p>

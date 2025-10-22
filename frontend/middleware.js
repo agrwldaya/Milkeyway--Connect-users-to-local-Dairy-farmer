@@ -4,7 +4,7 @@ import { jwtVerify } from "jose";
 
 export async function middleware(req) {
   const token = req.cookies.get("token")?.value;
-   console.log("token",token)
+  
   // No token: block access to protected routes
   if (!token) {
     return NextResponse.redirect(new URL("/auth/login", req.url));
@@ -13,7 +13,25 @@ export async function middleware(req) {
   // Validate JWT using Edge-compatible library
   try {
     const secret = new TextEncoder().encode(process.env.JWT_SECRET);
-    await jwtVerify(token, secret);
+    const { payload } = await jwtVerify(token, secret);
+    
+    // Extract user role from token
+    const userRole = payload.role;
+    const pathname = req.nextUrl.pathname;
+    
+    // Role-based access control
+    if (pathname.startsWith('/consumer') && userRole !== 'consumer') {
+      return NextResponse.redirect(new URL("/auth/login", req.url));
+    }
+    
+    if (pathname.startsWith('/farmer') && userRole !== 'farmer') {
+      return NextResponse.redirect(new URL("/auth/login", req.url));
+    }
+    
+    if (pathname.startsWith('/admin') && userRole !== 'super_admin') {
+      return NextResponse.redirect(new URL("/auth/login", req.url));
+    }
+    
     return NextResponse.next();
   } catch (_) {
     // Invalid or expired token → redirect to login

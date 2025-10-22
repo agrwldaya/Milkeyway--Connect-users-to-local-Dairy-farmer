@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Search, MapPin, Star, Milk, Filter, Loader2, AlertCircle, Users, MessageCircle } from "lucide-react"
 import { ConsumerNav } from "@/components/consumer-nav"
+import { api } from "@/lib/utils"
 
 export default function ProductDiscoveryPage() {
   const [searchQuery, setSearchQuery] = useState("")
@@ -80,20 +81,9 @@ export default function ProductDiscoveryPage() {
     try {
       setLoading(true)
       console.log("Fetching farmers with params:", { categoryId, lat, lng, radius })
-      const response = await fetch(`http://localhost:4000/api/v1/consumers/farmers-by-category?categoryId=${categoryId}&latitude=${lat}&longitude=${lng}&radius=${radius}`)
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`)
-      }
-      
-      const data = await response.json()
-      console.log("API Response:", data)
-
-      if (data.success) {
-        setFarmers(data.farmers)
-      } else {
-        setError(data.message || "Failed to fetch farmers")
-      }
+      const response = await api.get(`/api/v1/consumers/farmers-by-category?categoryId=${categoryId}&latitude=${lat}&longitude=${lng}&radius=${radius}`)
+      const data = await response.data
+      setFarmers(data.farmers)
     } catch (err) {
       console.error("Error fetching farmers:", err)
       setError("Failed to fetch farmers")

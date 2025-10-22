@@ -49,9 +49,15 @@ export default function FarmerProfilePage() {
         
         if (data.success) {
           setFarmer(data.farmer)
+          console.log("Farmer data:", data.farmer)
           // Check connection status after fetching farmer details
-          setConnectionStatus(data.farmer.existingConnectionStatus)
-          setIsConnected(data.farmer.existingConnectionStatus === 'connected')
+          if(data.farmer.existingConnectionStatus === 'accepted'){
+            setConnectionStatus('connected')
+            setIsConnected(true)
+          } else {
+            setConnectionStatus('not_connected')
+            setIsConnected(false)
+          }
         } else {
           setError(data.message || "Failed to fetch farmer details")
         }
@@ -62,12 +68,11 @@ export default function FarmerProfilePage() {
         setLoading(false)
       }
     }
-
     if (params.id) {
       fetchFarmerDetails()
     }
   }, [params.id])
-
+  
   // Handle request submission
   const handleRequestSubmit = async (e) => {
     e.preventDefault()
@@ -187,7 +192,7 @@ export default function FarmerProfilePage() {
   ]
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 px-2">
       <ConsumerNav />
 
       <main className="container py-8">
@@ -508,7 +513,7 @@ export default function FarmerProfilePage() {
             {farmer.products && farmer.products.length > 0 ? (
               <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
                 {farmer.products.map((product) => (
-                  <Card key={product.id} className="overflow-hidden group hover:shadow-lg transition-shadow bg-white">
+                  <Card key={product.id} className="overflow-hidden rounded-2xl group hover:shadow-lg transition-shadow bg-white">
                     <Link href={`/consumer/product/${product.id}`}>
                       <div className="relative aspect-square overflow-hidden bg-gray-100">
                         <img

@@ -14,14 +14,13 @@ import {
   Store,
   Users,
   MessageCircle,
-  Activity,
   UserCheck,
-  TrendingUp,
   Shield,
   CheckCircle,
   Settings,
   LogOut,
   Menu, // Import the Menu icon for the hamburger
+  Activity,
 } from "lucide-react"
 
 export function AdminNav() {
@@ -45,7 +44,6 @@ export function AdminNav() {
     { href: "/admin/connections", icon: UserCheck, label: "Connections" },
     { href: "/admin/requests", icon: MessageCircle, label: "Requests" },
     { href: "/admin/activity", icon: Activity, label: "Activity" },
-    { href: "/admin/analytics", icon: TrendingUp, label: "Analytics" },
   ]
 
   return (

@@ -147,7 +147,7 @@ export const completeConsumerProfile = async (req, res) => {
       secure: process.env.NODE_ENV === "production",
       sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
       path: "/",
-      maxAge: 60 * 60 * 1000, // 1 hour
+      maxAge: 2 * 60 * 60 * 1000, // 2 hours
     });
 
     // Set refresh token cookie (long-lived, scoped to refresh endpoint)
@@ -176,7 +176,7 @@ export const completeConsumerProfile = async (req, res) => {
 };
 
 // Consumer Login
-export const loginConsumer = async (req, res) => {
+export const loginConsumer = async (req, res) => {  
   try {
     const { email, password } = req.body;
 
@@ -220,7 +220,7 @@ export const loginConsumer = async (req, res) => {
       secure: process.env.NODE_ENV === "production",
       sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
       path: "/",
-      maxAge: 15 * 60 * 1000, // 15 min
+      maxAge: 2 * 60 * 60 * 1000, // 2 hours
     });
 
     // Set refresh token cookie (long-lived, scoped to refresh endpoint)
@@ -251,7 +251,7 @@ export const loginConsumer = async (req, res) => {
 // Get nearby farmers based on consumer location
 export const getNearbyFarmers = async (req, res) => {
   try {
-    const { latitude, longitude, radius = 10 } = req.query;
+    const { latitude, longitude, radius = 20 } = req.query;
     
     console.log(latitude, longitude, radius);
 
@@ -402,29 +402,31 @@ export const getFarmersByCategory = async (req, res) => {
 
     // Simple test query first
     const query = `
-      SELECT 
-        f.id as farmer_id,
-        u.name as farmer_name,
-        f.farm_name,
-        f.address,
-        f.latitude,
-        f.longitude
-      FROM farmer_profiles f
-      JOIN users u ON f.user_id = u.id
-      JOIN products p ON f.id = p.farmer_id
-      WHERE f.status = 'approved'   
-        AND f.latitude IS NOT NULL 
-        AND f.longitude IS NOT NULL
-        AND p.is_available = true
-        AND p.category_id = $1
-      LIMIT 10
-    `;
-    
+    SELECT 
+      f.id AS farmer_id,
+      u.name AS farmer_name,
+      f.farm_name,
+      f.address,
+      f.latitude,
+      f.longitude,
+      p.name AS product_name,
+      p.price_per_unit AS price_per_unit
+    FROM farmer_profiles f
+    JOIN users u ON f.user_id = u.id
+    JOIN products p ON f.id = p.farmer_id
+    WHERE f.status = 'approved'
+      AND f.latitude IS NOT NULL
+      AND f.longitude IS NOT NULL
+      AND p.is_available = true
+      AND p.category_id = $1
+    LIMIT 10
+  `;
+  
 
     //console.log("Executing query with categoryId:", parseInt(categoryId));
     const result = await pool.query(query, [parseInt(categoryId)]);
     //console.log("Query result:", result.rows.length, "farmers found");
-
+    
     // Format the response
     const farmers = result.rows.map(farmer => ({
       id: farmer.farmer_id,
@@ -436,7 +438,8 @@ export const getFarmersByCategory = async (req, res) => {
       description: "Fresh dairy products from a trusted local farmer.",
       rating: 4.5, // Default rating
       reviews: 0, // Default reviews
-      products: [], // Empty for now
+      products: [{name: farmer.product_name, price: farmer.price_per_unit}], // Empty for now
+      price: `₹${farmer.price_per_unit}`,
       distance: "0.0 km", // Default distance
       verified: false, // Default
       status: "approved"
@@ -516,6 +519,7 @@ export const getFarmerDetails = async (req, res) => {
         p.price_per_unit,
         p.unit,
         p.stock_quantity,
+        c.imageurl as category_image,
         c.name as category_name
       FROM products p
       LEFT JOIN categories c ON p.category_id = c.id
@@ -527,6 +531,8 @@ export const getFarmerDetails = async (req, res) => {
 
     const existingConnection = await pool.query("SELECT * FROM farmer_requests WHERE farmer_id = $1 AND consumer_id = $2", [farmerId, consumerId]);
     const existingConnectionStatus = existingConnection.rows.length > 0 ? existingConnection.rows[0].status : null;
+
+     
 
     // Format the response
     const farmerData = {
@@ -559,6 +565,7 @@ export const getFarmerDetails = async (req, res) => {
         price: product.price_per_unit,
         unit: product.unit,
         stock: product.stock_quantity,
+        image: product.category_image,
         category: product.category_name
       })),
       existingConnectionStatus
@@ -621,6 +628,30 @@ export const getConsumerProfile = async (req, res) => {
     res.status(200).json({ message: "Consumer profile fetched successfully", consumerProfile: consumerProfileData });
   } catch (error) {
     console.error("Get Consumer Profile Error:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+// get consumer connection data for dashboard
+export const getConsumerConnectionData = async (req, res) => {
+  try {
+    const consumerId = req.user.user_id;
+    if(!consumerId) {
+      return res.status(400).json({ message: "Consumer ID is required" });
+    }
+    const connectionData = await pool.query("SELECT * FROM consumer_activity_summary WHERE consumer_id = $1", [consumerId]);
+    const response = {
+      totalRequests: connectionData.rows[0].total_requests_sent,
+      totalActiveConnections: connectionData.rows[0].active_connections,
+      totalAcceptedRequests: connectionData.rows[0].accepted_requests,
+      totalRejectedRequests: connectionData.rows[0].rejected_requests,
+      totalPendingRequests: connectionData.rows[0].pending_requests,
+      requestSuccessRate: connectionData.rows[0].request_success_rate
+    };
+    res.status(200).json({ message: "Consumer connection data fetched successfully", connectionData: response });
+  }
+  catch (error) {
+    console.error("Get Consumer Connection Data Error:", error);
     res.status(500).json({ message: "Internal server error" });
   }
 };

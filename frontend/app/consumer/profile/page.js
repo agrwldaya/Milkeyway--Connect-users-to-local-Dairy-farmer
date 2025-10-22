@@ -45,7 +45,7 @@ export default function ProfilePage() {
 
   if(isLoading) return <div className="flex justify-center items-center h-screen"><Loader2 className="w-10 h-10 animate-spin" /></div>
   if(error) return <div className="flex justify-center items-center h-screen"><AlertCircle className="w-10 h-10 text-red-500" />{error}</div>
-  if(!consumerProfile) return <div className="flex justify-center items-center h-screen"><AlertCircle className="w-10 h-10 text-red-500" />Consumer profile not found</div>
+  if(!consumerProfile) return <div className="flex justify-center items-center h-screen"><Loader2 className="w-10 h-10 animate-spin" /></div>
   
   return (
     <div className="min-h-screen bg-gray-50">
@@ -58,7 +58,7 @@ export default function ProfilePage() {
           {/* Profile Card */}
           <Card className="bg-white">
             <CardContent className="p-6 text-center">
-              <div className="relative inline-block mb-4">
+              <div className="relative inline-block mb-4 border-2 border-primary rounded-full">
                 <Avatar className="h-32 w-32">
                   <AvatarImage src={consumerProfile.image} />
                   <AvatarFallback className="text-2xl">PS</AvatarFallback>

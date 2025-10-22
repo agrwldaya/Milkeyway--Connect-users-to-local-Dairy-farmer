@@ -8,9 +8,10 @@ import {
   getCategories,
   getFarmersByCategory,
   getConsumerProfile,
+  getConsumerConnectionData,
 } from "../controllers/consumerController.js";
 import { verifyOtp } from "../controllers/autocontroller.js";
-import { authMiddleware } from "../middleware/authMiddleWare.js";
+import { authMiddleware, verifyConsumer } from "../middleware/authMiddleWare.js";
 
 const consumerRouter = express.Router();
 
@@ -33,7 +34,7 @@ consumerRouter.post("/login", loginConsumer);
 consumerRouter.get("/nearby-farmers", getNearbyFarmers);
 
 // Get specific farmer details with products
-consumerRouter.get("/farmer/:farmerId", authMiddleware, getFarmerDetails);
+consumerRouter.get("/farmer/:farmerId", authMiddleware, verifyConsumer, getFarmerDetails);
 
  
 
@@ -44,6 +45,9 @@ consumerRouter.get("/categories", getCategories);
 consumerRouter.get("/farmers-by-category", getFarmersByCategory);
 
 // Get consumer profile
-consumerRouter.get("/profile", authMiddleware, getConsumerProfile);
+consumerRouter.get("/profile", authMiddleware, verifyConsumer, getConsumerProfile);
+
+// get consumers connection data for dashboard
+consumerRouter.get("/connection-data", authMiddleware, verifyConsumer, getConsumerConnectionData);
 
 export default consumerRouter;

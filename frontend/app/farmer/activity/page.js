@@ -30,7 +30,7 @@ export default function FarmerActivityPage() {
         credentials: 'include'
       })
       const data = await response.json()
-      
+          console.log(data);
       if (data.success) {
         setActivities(data.activities)
         calculateStats(data.activities)
@@ -165,9 +165,9 @@ export default function FarmerActivityPage() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen">
         <FarmerNav />
-        <main className="container py-8">
+        <main className="container py-8 px-5">
           <Card className="p-8 text-center">
             <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
             <h2 className="text-xl font-semibold mb-2">Error Loading Activity</h2>
@@ -180,10 +180,10 @@ export default function FarmerActivityPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen">
       <FarmerNav />
       
-      <main className="container py-8">
+      <main className="container py-8 px-5">
         <div className="mb-6 sm:mb-8">
           <h1 className="text-2xl sm:text-3xl lg:text-4xl font-serif font-bold mb-2">Activity Dashboard</h1>
           <p className="text-sm sm:text-base text-muted-foreground">Track your connection activity and performance</p>
