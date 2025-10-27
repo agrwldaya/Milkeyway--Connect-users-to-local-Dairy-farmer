@@ -5,18 +5,33 @@ import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Package, Users, MessageCircle, Activity, Plus, Edit, Trash2, CheckCircle, XCircle, UserPlus, AlertCircle } from "lucide-react"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Package, Users, MessageCircle, Activity, Plus, Edit, Trash2, CheckCircle, XCircle, UserPlus, AlertCircle, MapPin, Upload, ExternalLink } from "lucide-react"
 import { FarmerNav } from "@/components/farmer-nav"
 import { api } from "@/lib/utils"
+import { toast } from "sonner"
 
 export default function FarmerDashboard() {
   const [dashboardData, setDashboardData] = useState(null);
+  const [dashboardStatus, setDashboardStatus] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
   useEffect(() => {
     fetchDashboardData();
+    fetchDashboardStatus();
   }, []);
+
+  const fetchDashboardStatus = async () => {
+    try {
+      const response = await api.get('/api/v1/farmers/dashboard-status');
+      if (response.data.success) {
+        setDashboardStatus(response.data);
+      }
+    } catch (err) {
+      console.error('Dashboard status fetch error:', err);
+    }
+  };
 
   const fetchDashboardData = async () => {
     try {
@@ -79,6 +94,56 @@ export default function FarmerDashboard() {
           </h1>
           <p className="text-muted-foreground text-sm sm:text-base">Manage your connections and grow your consumer network</p>
         </div>
+
+        {/* Message Bar for Incomplete Profile */}
+        {dashboardStatus?.messageBar && (
+          <Alert className={`mb-6 ${
+            dashboardStatus.messageBar.type === 'warning' 
+              ? 'border-yellow-200 bg-yellow-50' 
+              : 'border-blue-200 bg-blue-50'
+          }`}>
+            <AlertCircle className={`h-4 w-4 ${
+              dashboardStatus.messageBar.type === 'warning' 
+                ? 'text-yellow-600' 
+                : 'text-blue-600'
+            }`} />
+            <AlertDescription className={`${
+              dashboardStatus.messageBar.type === 'warning' 
+                ? 'text-yellow-800' 
+                : 'text-blue-800'
+            }`}>
+              <div className="flex items-center justify-between">
+                <span>{dashboardStatus.messageBar.message}</span>
+                {dashboardStatus.messageBar.action && (
+                  <Button 
+                    size="sm" 
+                    variant="outline"
+                    className="ml-4"
+                    onClick={() => {
+                      if (dashboardStatus.messageBar.action === 'update_location') {
+                        window.location.href = '/farmer/profile';
+                      } else if (dashboardStatus.messageBar.action === 'upload_documents') {
+                        window.location.href = '/farmer/profile';
+                      }
+                    }}
+                  >
+                    {dashboardStatus.messageBar.action === 'update_location' ? (
+                      <>
+                        <MapPin className="h-4 w-4 mr-2" />
+                        Update Location
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="h-4 w-4 mr-2" />
+                        Upload Documents
+                      </>
+                    )}
+                  </Button>
+                )}
+              </div>
+            </AlertDescription>
+          </Alert>
+        )}
 
         {/* Stats Overview */}
         <div className="grid gap-4 sm:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 mb-6 sm:mb-8">
@@ -239,7 +304,11 @@ export default function FarmerDashboard() {
                   <CardDescription>Manage your product listings for consumer discovery</CardDescription>
                 </div>
                 <Link href="/farmer/products/add">
-                  <Button size="sm" className="bg-[#80e619] hover:bg-[#80e619]/90">
+                  <Button 
+                    size="sm" 
+                    className="bg-[#80e619] hover:bg-[#80e619]/90"
+                    disabled={!dashboardStatus?.restrictions?.canAddProducts}
+                  >
                     <Plus className="h-4 w-4 mr-2" />
                     Add Product
                   </Button>

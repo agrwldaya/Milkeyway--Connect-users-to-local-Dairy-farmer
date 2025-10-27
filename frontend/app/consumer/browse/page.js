@@ -1,18 +1,53 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Search, Star, ShoppingCart, SlidersHorizontal, MapPin } from "lucide-react"
+import { Search, Star, ShoppingCart, SlidersHorizontal, MapPin, Map } from "lucide-react"
 import { ConsumerNav } from "@/components/consumer-nav"
+import ConsumerMapPicker from "@/components/ConsumerMapPicker"
+import { api } from "@/lib/utils"
 
 export default function BrowsePage() {
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedCategory, setSelectedCategory] = useState("all")
+  const [location, setLocation] = useState(null)
+  const [showMapView, setShowMapView] = useState(false)
+  const [farmers, setFarmers] = useState([])
+  const [loading, setLoading] = useState(false)
+  const [categories, setCategories] = useState([])
+
+  // Fetch categories on component mount
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const response = await api.get('/api/v1/consumers/categories')
+        const data = response.data
+        if (data.success) {
+          setCategories(data.categories)
+        }
+      } catch (err) {
+        console.error("Error fetching categories:", err)
+      }
+    }
+    fetchCategories()
+  }, [])
+
+  // Handle location change from map
+  const handleLocationChange = (newLocation) => {
+    setLocation(newLocation)
+    // You can add logic here to fetch farmers based on location
+  }
+
+  // Handle farmer selection from map
+  const handleFarmerSelect = (farmer) => {
+    // Navigate to farmer details page
+    window.location.href = `/consumer/farmer/${farmer.id}`
+  }
 
   const products = [
     {
@@ -107,7 +142,7 @@ export default function BrowsePage() {
         </div>
 
         {/* Filters */}
-        <div className="mb-8 flex flex-col md:flex-row gap-4">
+        <div className="mb-8 flex flex-col sm:flex-row gap-3">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-3 h-5 w-5 text-muted-foreground" />
             <Input
@@ -118,7 +153,7 @@ export default function BrowsePage() {
             />
           </div>
           <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-            <SelectTrigger className="w-full md:w-[200px] h-12 bg-white">
+            <SelectTrigger className="w-full sm:w-[200px] h-12 bg-white">
               <SelectValue placeholder="Category" />
             </SelectTrigger>
             <SelectContent>
@@ -130,7 +165,16 @@ export default function BrowsePage() {
               <SelectItem value="butter">Butter</SelectItem>
             </SelectContent>
           </Select>
-          <Button variant="outline" size="lg" className="bg-white">
+          <Button 
+            variant={showMapView ? "default" : "outline"} 
+            size="lg"
+            onClick={() => setShowMapView(!showMapView)}
+            className="bg-white w-full sm:w-auto"
+          >
+            <Map className="h-5 w-5 mr-2" />
+            {showMapView ? "List View" : "Map View"}
+          </Button>
+          <Button variant="outline" size="lg" className="bg-white w-full sm:w-auto">
             <SlidersHorizontal className="h-5 w-5 mr-2" />
             Filters
           </Button>
@@ -141,8 +185,25 @@ export default function BrowsePage() {
           <p className="text-sm text-muted-foreground">Showing {products.length} products</p>
         </div>
 
-        {/* Products Grid */}
-        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        {/* Map View */}
+        {showMapView && (
+          <div className="mb-8">
+            <ConsumerMapPicker
+              onFarmerSelect={handleFarmerSelect}
+              initialLocation={location}
+              farmers={farmers}
+              categories={categories}
+              onLocationChange={handleLocationChange}
+              loading={loading}
+            />
+          </div>
+        )}
+
+        {/* List View */}
+        {!showMapView && (
+          <>
+            {/* Products Grid */}
+            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {products.map((product) => (
             <Card key={product.id} className="overflow-hidden group hover:shadow-lg transition-all bg-white">
               <Link href={`/consumer/product/${product.id}`}>
@@ -190,6 +251,8 @@ export default function BrowsePage() {
             </Card>
           ))}
         </div>
+          </>
+        )}
       </main>
     </div>
   )

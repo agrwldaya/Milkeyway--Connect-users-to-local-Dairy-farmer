@@ -6,9 +6,10 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-import { Search, MapPin, Star, Users, MessageCircle, Filter, Loader2, AlertCircle, Activity, TrendingUp, Milk } from "lucide-react"
+import { Search, MapPin, Star, Users, MessageCircle, Filter, Loader2, AlertCircle, Activity, TrendingUp, Milk, Map } from "lucide-react"
 import { ConsumerNav } from "@/components/consumer-nav"
 import { api } from "@/lib/utils"
+import ConsumerMapPicker from "@/components/ConsumerMapPicker"
 
 export default function ConsumerDashboard() {
   const [searchQuery, setSearchQuery] = useState("")
@@ -18,8 +19,58 @@ export default function ConsumerDashboard() {
   const [error, setError] = useState(null)
   const [locationPermission, setLocationPermission] = useState(null)
   const [consumerConnectionData, setConsumerConnectionData] = useState(null)
+  const [categories, setCategories] = useState([])
+  const [showMapView, setShowMapView] = useState(false)
+  const [selectedFarmer, setSelectedFarmer] = useState(null)
 
   //console.log(consumerConnectionData)
+
+  // Fetch categories on component mount
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const response = await api.get('/api/v1/consumers/categories')
+        const data = response.data
+        if (data.success) {
+          setCategories(data.categories)
+        }
+      } catch (err) {
+        console.error("Error fetching categories:", err)
+      }
+    }
+    fetchCategories()
+  }, [])
+
+  // Handle farmer selection from map
+  const handleFarmerSelect = (farmer) => {
+    setSelectedFarmer(farmer)
+    // Navigate to farmer details page
+    window.location.href = `/consumer/farmer/${farmer.id}`
+  }
+
+  // Handle location change from map
+  const handleLocationChange = (newLocation) => {
+    setLocation(newLocation)
+    fetchNearbyFarmers(newLocation.latitude, newLocation.longitude)
+  }
+
+  // Handle category change from map
+  const handleCategoryChange = async (categoryId) => {
+    if (location) {
+      try {
+        setLoading(true)
+        const response = await api.get(`/api/v1/consumers/farmers-by-category?categoryId=${categoryId}&latitude=${location.latitude}&longitude=${location.longitude}&radius=10`)
+        const data = response.data
+        if (data.success) {
+          setNearbyFarmers(data.farmers)
+        }
+      } catch (err) {
+        console.error("Error fetching farmers by category:", err)
+      } finally {
+        setLoading(false)
+      }
+    }
+  }
 
   // Request user location
   const requestLocation = async () => {
@@ -81,9 +132,27 @@ export default function ConsumerDashboard() {
       
      // console.log(data)
       setConsumerConnectionData(data.connectionData)
+      setError(null) // Clear any previous errors
     } catch (err) {
       console.error("Error fetching consumer connection data:", err)
-      setError("Failed to fetch consumer connection data")
+      
+      // Handle different types of errors
+      if (err.response?.status === 401) {
+        setError("Please log in to view your connection data")
+      } else if (err.response?.status === 404) {
+        // No connection data exists yet, set default values
+        setConsumerConnectionData({
+          totalRequests: 0,
+          totalActiveConnections: 0,
+          totalAcceptedRequests: 0,
+          totalRejectedRequests: 0,
+          totalPendingRequests: 0,
+          requestSuccessRate: 0
+        })
+        setError(null)
+      } else {
+        setError("Failed to fetch consumer connection data")
+      }
     }
   }
   // Check if location permission was previously granted
@@ -151,11 +220,19 @@ export default function ConsumerDashboard() {
               <Card className="p-4 border-red-200 bg-red-50">
                 <div className="flex items-center gap-2 text-red-600">
                   <AlertCircle className="h-5 w-5" />
-                  <span className="font-medium">Location Error</span>
+                  <span className="font-medium">
+                    {error.includes("connection data") ? "Connection Error" : "Location Error"}
+                  </span>
                 </div>
                 <p className="text-red-600 mt-2">{error}</p>
                 <Button 
-                  onClick={requestLocation} 
+                  onClick={() => {
+                    if (error.includes("connection data")) {
+                      fetchConsumerConnectionData()
+                    } else {
+                      requestLocation()
+                    }
+                  }} 
                   variant="outline" 
                   size="sm" 
                   className="mt-3"
@@ -284,13 +361,42 @@ export default function ConsumerDashboard() {
                 </span>
               )}
             </h2>
-            <Button variant="outline" size="sm">
-              <Filter className="h-4 w-4 mr-2" />
-              Filter
-            </Button>
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
+              <Button 
+                variant={showMapView ? "default" : "outline"} 
+                size="sm"
+                onClick={() => setShowMapView(!showMapView)}
+                className="w-full sm:w-auto"
+              >
+                <Map className="h-4 w-4 mr-2" />
+                {showMapView ? "List View" : "Map View"}
+              </Button>
+              <Button variant="outline" size="sm" className="w-full sm:w-auto">
+                <Filter className="h-4 w-4 mr-2" />
+                Filter
+              </Button>
+            </div>
           </div>
 
-          {loading && (
+          {/* Map View */}
+          {showMapView && (
+            <div className="mb-8">
+              <ConsumerMapPicker
+                onFarmerSelect={handleFarmerSelect}
+                initialLocation={location}
+                farmers={nearbyFarmers}
+                categories={categories}
+                onCategoryChange={handleCategoryChange}
+                onLocationChange={handleLocationChange}
+                loading={loading}
+              />
+            </div>
+          )}
+
+          {/* List View */}
+          {!showMapView && (
+            <>
+              {loading && (
             <div className="flex items-center justify-center py-12">
               <Loader2 className="h-8 w-8 animate-spin text-primary" />
               <span className="ml-2 text-muted-foreground">Finding nearby farmers...</span>
@@ -314,7 +420,7 @@ export default function ConsumerDashboard() {
           )}
 
           {!loading && nearbyFarmers.length > 0 && (
-            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+            <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {nearbyFarmers.map((farmer) => (
                 <Card key={farmer.id} className="overflow-hidden hover:shadow-lg transition-shadow">
                   <div className="relative aspect-video overflow-hidden bg-muted">
@@ -378,6 +484,8 @@ export default function ConsumerDashboard() {
                 )}
               </Button>
             </div>
+          )}
+            </>
           )}
         </div>
 

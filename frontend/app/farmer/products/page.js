@@ -6,13 +6,15 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Plus, Search, Edit, Trash2, Eye, MoreVertical } from "lucide-react"
 import { FarmerNav } from "@/components/farmer-nav"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { AlertCircle } from "lucide-react"
 import { api } from "@/lib/utils"
 import { toast } from "sonner"
 
@@ -22,6 +24,7 @@ export default function ProductsPage() {
   const [products, setProducts] = useState([])
   const [isUpdateDialogOpen, setIsUpdateDialogOpen] = useState(false)
   const [editingProduct, setEditingProduct] = useState(null)
+  const [isApproved, setIsApproved] = useState(false) // Add approval status
   const [updateForm, setUpdateForm] = useState({
     unit: "",
     price_per_unit: "",
@@ -36,8 +39,13 @@ export default function ProductsPage() {
       try {
         const res = await api.get(`${API_BASE}/api/v1/farmers/products`)
         const data = res.data
+        console.log(data)
         if (!data?.success) throw new Error(data?.message || "Failed to load products")
         if (!active) return
+        
+        // Set approval status
+        setIsApproved(data.isApproved || false)
+        
         // Map API fields to UI
         const mapped = (data.products || []).map((p) => ({
           id: p.id,
@@ -127,12 +135,36 @@ export default function ProductsPage() {
             <p className="text-muted-foreground">Manage your product listings and inventory</p>
           </div>
           <Link href="/farmer/products/add">
-            <Button className="bg-primary hover:bg-primary/90">
+            <Button 
+              className="bg-primary hover:bg-primary/90"
+              disabled={!isApproved}
+              title={!isApproved ? "Complete your profile and get approved to add products" : ""}
+            >
               <Plus className="h-4 w-4 mr-2" />
               Add New Product
             </Button>
           </Link>
         </div>
+
+        {/* Approval Status Warning */}
+        {!isApproved && (
+          <Alert className="mb-6 border-yellow-200 bg-yellow-50">
+            <AlertCircle className="h-4 w-4 text-yellow-600" />
+            <AlertDescription className="text-yellow-800">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-medium">Account Pending Approval</p>
+                  <p className="text-sm">You can view your products but cannot add or edit them until your account is approved by admin.</p>
+                </div>
+                <Link href="/farmer/profile">
+                  <Button variant="outline" size="sm" className="text-yellow-800 border-yellow-300 hover:bg-yellow-100">
+                    Complete Profile
+                  </Button>
+                </Link>
+              </div>
+            </AlertDescription>
+          </Alert>
+        )}
 
         {/* Filters */}
         <Card className="mb-6">
@@ -211,7 +243,10 @@ export default function ProductsPage() {
                               <Eye className="h-4 w-4 mr-2" />
                               View Details
                             </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleEditProduct(product)}>
+                            <DropdownMenuItem 
+                              onClick={() => handleEditProduct(product)}
+                              disabled={!isApproved}
+                            >
                               <Edit className="h-4 w-4 mr-2" />
                               Edit Product
                             </DropdownMenuItem>

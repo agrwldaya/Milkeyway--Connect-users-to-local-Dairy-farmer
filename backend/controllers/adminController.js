@@ -244,9 +244,11 @@ export const getPendingFarmers = async (req, res) => {
              fd.farm_image_url, fd.farmer_image_url, fd.farmer_proof_doc_url, fd.is_doc_verified, fd.created_at as doc_created_at
       FROM users u
       JOIN farmer_profiles fp ON u.id = fp.user_id
-      LEFT JOIN farmer_docs fd ON fp.id = fd.farmer_id
-      WHERE u.role = 'farmer' AND (fp.status = 'draft' OR fp.status = 'rejected' or fp.status = 'pending')
-      ORDER BY fp.created_at DESC;
+      INNER JOIN farmer_docs fd ON fp.id = fd.farmer_id
+      WHERE u.role = 'farmer' 
+        AND (fp.status = 'draft' OR fp.status = 'rejected' OR fp.status = 'pending')
+        AND fd.farmer_proof_doc_url IS NOT NULL
+      ORDER BY fd.created_at DESC;
     `;
 
     const result = await pool.query(query);

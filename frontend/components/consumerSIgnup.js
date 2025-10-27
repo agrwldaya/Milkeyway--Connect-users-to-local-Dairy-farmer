@@ -6,13 +6,16 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
+import { Card, CardContent } from "@/components/ui/card"
+import { MapPin, Navigation, CheckCircle } from "lucide-react"
 import { toast } from "sonner"
+import ConsumerMapPicker from "@/components/ConsumerMapPicker"
 
 export default function ConsumerSignup({ formData, setFormData, onBack }) {
   const router = useRouter()
   const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000"
 
-  const [subStep, setSubStep] = useState("basic") // basic -> otp -> profile
+  const [subStep, setSubStep] = useState("basic") // basic -> otp -> profile -> location
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [userId, setUserId] = useState(null)
   const [pincode, setPincode] = useState("")
@@ -20,6 +23,7 @@ export default function ConsumerSignup({ formData, setFormData, onBack }) {
   const [state, setState] = useState("")
   const [city, setCity] = useState("")
   const [otp, setOtp] = useState("")
+  const [selectedLocation, setSelectedLocation] = useState(null)
 
   useEffect(() => {
     const getAddress = async () => {
@@ -117,7 +121,7 @@ export default function ConsumerSignup({ formData, setFormData, onBack }) {
   const [profile, setProfile] = useState({ address: "", preferred_radius_km: "", latitude: "", longitude: "" })
 
   const handleCompleteProfile = async () => {
-    if (!profile.address || !profile.preferred_radius_km || !profile.latitude || !profile.longitude) {
+    if (!profile.address || !profile.preferred_radius_km) {
       toast.error("Please fill complete profile details")
       return
     }
@@ -130,8 +134,8 @@ export default function ConsumerSignup({ formData, setFormData, onBack }) {
         body: JSON.stringify({
           address: profile.address,
           preferred_radius_km: Number(profile.preferred_radius_km),
-          latitude: Number(profile.latitude),
-          longitude: Number(profile.longitude),
+          latitude: null, // Will be set in location step
+          longitude: null, // Will be set in location step
         }),
       })
       const data = await res.json()
@@ -140,6 +144,46 @@ export default function ConsumerSignup({ formData, setFormData, onBack }) {
         return
       }
       toast.success(data.message)
+      setSubStep("location")
+    } catch (err) {
+      toast.error(err.message)
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  // Handle location selection
+  const handleLocationSelect = (location) => {
+    setSelectedLocation(location)
+  }
+
+  // Complete signup with location
+  const handleCompleteSignup = async () => {
+    if (!selectedLocation) {
+      toast.error("Please select your location")
+      return
+    }
+    
+    setIsSubmitting(true)
+    try {
+      // Update profile with location
+      const res = await fetch(`${API_BASE}/api/v1/consumers/location-signup`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          user_id: userId,
+          latitude: selectedLocation.latitude,
+          longitude: selectedLocation.longitude,
+          address: profile.address
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok){
+        toast.error(data?.message || "Location update failed")
+        return
+      }
+      toast.success("Registration completed successfully!")
       router.push("/consumer/dashboard")
     } catch (err) {
       toast.error(err.message)
@@ -210,6 +254,71 @@ export default function ConsumerSignup({ formData, setFormData, onBack }) {
         <div className="flex gap-3">
           <Button type="button" variant="outline" onClick={() => setSubStep("basic")} className="flex-1">Back</Button>
           <Button onClick={handleVerifyOtp} className="flex-1 bg-[#80e619] hover:bg-[#80e619]/90" disabled={isSubmitting}>{isSubmitting ? "Verifying..." : "Verify"}</Button>
+        </div>
+      </div>
+    )
+  }
+
+  if (subStep === "profile") {
+    return (
+      <div className="space-y-4">
+        <div className="space-y-2">
+          <Label htmlFor="address">Address</Label>
+          <Textarea id="address" placeholder="Enter your address" value={profile.address} onChange={(e) => setProfile({ ...profile, address: e.target.value })} />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="radius">Preferred Radius (km)</Label>
+          <Input id="radius" type="number" placeholder="10" value={profile.preferred_radius_km} onChange={(e) => setProfile({ ...profile, preferred_radius_km: e.target.value })} />
+        </div>
+        <div className="flex gap-3">
+          <Button type="button" variant="outline" onClick={() => setSubStep("otp")} className="flex-1">Back</Button>
+          <Button onClick={handleCompleteProfile} className="flex-1 bg-[#80e619] hover:bg-[#80e619]/90" disabled={isSubmitting}>{isSubmitting ? "Saving..." : "Next: Set Location"}</Button>
+        </div>
+      </div>
+    )
+  }
+
+  if (subStep === "location") {
+    return (
+      <div className="space-y-6">
+        <div className="text-center">
+          <h3 className="text-lg font-semibold mb-2">Set Your Location</h3>
+          <p className="text-sm text-muted-foreground">Choose your location to find nearby farmers</p>
+        </div>
+        
+        <Card>
+          <CardContent className="p-4">
+            <ConsumerMapPicker
+              onLocationChange={handleLocationSelect}
+              initialLocation={null}
+              farmers={[]}
+              categories={[]}
+              loading={false}
+            />
+          </CardContent>
+        </Card>
+
+        {selectedLocation && (
+          <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
+            <div className="flex items-center gap-2 text-green-700">
+              <CheckCircle className="h-5 w-5" />
+              <span className="font-medium">Location Selected</span>
+            </div>
+            <p className="text-sm text-green-600 mt-1">
+              Lat: {Number(selectedLocation.latitude).toFixed(6)}, Lng: {Number(selectedLocation.longitude).toFixed(6)}
+            </p>
+          </div>
+        )}
+
+        <div className="flex gap-3">
+          <Button type="button" variant="outline" onClick={() => setSubStep("profile")} className="flex-1">Back</Button>
+          <Button 
+            onClick={handleCompleteSignup} 
+            className="flex-1 bg-[#80e619] hover:bg-[#80e619]/90" 
+            disabled={isSubmitting || !selectedLocation}
+          >
+            {isSubmitting ? "Completing..." : "Complete Registration"}
+          </Button>
         </div>
       </div>
     )

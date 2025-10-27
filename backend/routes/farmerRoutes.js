@@ -2,7 +2,10 @@ import express from "express";
 import {
   registerFarmer,
   completeFarmerProfile,
+  updateFarmerLocation,
   uploadDocuments,
+  submitProofDocuments,
+  getFarmerDashboardStatus,
   loginFarmer,
   addProducts,
   getFarmerProducts,
@@ -27,8 +30,14 @@ farmerRouter.post("/verify", verifyOtp);
 // STEP 3 - Complete farmer profile (personal + farm details)
 farmerRouter.post("/profile/:user_id", completeFarmerProfile);
 
+// STEP 3.5 - Update farmer location (latitude/longitude)
+farmerRouter.post("/location/:user_id", updateFarmerLocation);
+
 // STEP 4 - Upload documents (variation docs, ID proof, etc.)
 farmerRouter.post("/upload-docs/:user_id", uploadDocuments);
+
+// Submit proof documents (for farmers who haven't submitted yet)
+farmerRouter.post("/submit-proof-docs/:user_id", authMiddleware, verifyFarmer, submitProofDocuments);
 
 farmerRouter.post("/addproducts/:category_id/:milk_category_id", authMiddleware, verifyFarmer, addProducts);
 
@@ -41,6 +50,9 @@ farmerRouter.get("/showcategories", showcategories);
 farmerRouter.post("/login", loginFarmer);
 
 farmerRouter.get("/profile", authMiddleware, verifyFarmer, getFarmerProfile)
+
+// Get farmer dashboard status and restrictions
+farmerRouter.get("/dashboard-status", authMiddleware, verifyFarmer, getFarmerDashboardStatus);
 
 // Get farmer dashboard data
 farmerRouter.get("/dashboard", authMiddleware, verifyFarmer, getFarmerDashboardData);

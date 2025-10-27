@@ -6,8 +6,10 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-import { Search, MapPin, Star, Heart, Filter, Loader2, AlertCircle } from "lucide-react"
+import { Search, MapPin, Star, Heart, Filter, Loader2, AlertCircle, Map } from "lucide-react"
 import { ConsumerNav } from "@/components/consumer-nav"
+import ConsumerMapPicker from "@/components/ConsumerMapPicker"
+import { api } from "@/lib/utils"
 
 export default function FarmersPage() {
   const [searchQuery, setSearchQuery] = useState("")
@@ -16,8 +18,56 @@ export default function FarmersPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [locationPermission, setLocationPermission] = useState(null)
+  const [categories, setCategories] = useState([])
+  const [showMapView, setShowMapView] = useState(false)
+  const [selectedFarmer, setSelectedFarmer] = useState(null)
 
-  // Request user location
+  // Fetch categories on component mount
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const response = await api.get('/api/v1/consumers/categories')
+        const data = response.data
+        if (data.success) {
+          setCategories(data.categories)
+        }
+      } catch (err) {
+        console.error("Error fetching categories:", err)
+      }
+    }
+    fetchCategories()
+  }, [])
+
+  // Handle farmer selection from map
+  const handleFarmerSelect = (farmer) => {
+    setSelectedFarmer(farmer)
+    // Navigate to farmer details page
+    window.location.href = `/consumer/farmer/${farmer.id}`
+  }
+
+  // Handle location change from map
+  const handleLocationChange = (newLocation) => {
+    setLocation(newLocation)
+    fetchNearbyFarmers(newLocation.latitude, newLocation.longitude)
+  }
+
+  // Handle category change from map
+  const handleCategoryChange = async (categoryId) => {
+    if (location) {
+      try {
+        setLoading(true)
+        const response = await api.get(`/api/v1/consumers/farmers-by-category?categoryId=${categoryId}&latitude=${location.latitude}&longitude=${location.longitude}&radius=10`)
+        const data = response.data
+        if (data.success) {
+          setFarmers(data.farmers)
+        }
+      } catch (err) {
+        console.error("Error fetching farmers by category:", err)
+      } finally {
+        setLoading(false)
+      }
+    }
+  }
   const requestLocation = async () => {
     if (!navigator.geolocation) {
       setError("Geolocation is not supported by this browser.")
@@ -154,7 +204,7 @@ export default function FarmersPage() {
         )}
 
         {/* Search and Filters */}
-        <div className="mb-8 flex flex-col md:flex-row gap-4">
+        <div className="mb-8 flex flex-col sm:flex-row gap-3">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-3 h-5 w-5 text-muted-foreground" />
             <Input
@@ -164,7 +214,16 @@ export default function FarmersPage() {
               onChange={(e) => setSearchQuery(e.target.value)}
             />
           </div>
-          <Button variant="outline" size="lg" className="bg-white">
+          <Button 
+            variant={showMapView ? "default" : "outline"} 
+            size="lg"
+            onClick={() => setShowMapView(!showMapView)}
+            className="bg-white w-full sm:w-auto"
+          >
+            <Map className="h-5 w-5 mr-2" />
+            {showMapView ? "List View" : "Map View"}
+          </Button>
+          <Button variant="outline" size="lg" className="bg-white w-full sm:w-auto">
             <Filter className="h-5 w-5 mr-2" />
             Filters
           </Button>
@@ -178,8 +237,26 @@ export default function FarmersPage() {
           </Button>
         </div>
 
-        {/* Loading State */}
-        {loading && (
+        {/* Map View */}
+        {showMapView && (
+          <div className="mb-8">
+            <ConsumerMapPicker
+              onFarmerSelect={handleFarmerSelect}
+              initialLocation={location}
+              farmers={farmers}
+              categories={categories}
+              onCategoryChange={handleCategoryChange}
+              onLocationChange={handleLocationChange}
+              loading={loading}
+            />
+          </div>
+        )}
+
+        {/* List View */}
+        {!showMapView && (
+          <>
+            {/* Loading State */}
+            {loading && (
           <div className="flex items-center justify-center py-12">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
             <span className="ml-2 text-muted-foreground">Finding nearby farmers...</span>
@@ -205,7 +282,7 @@ export default function FarmersPage() {
 
         {/* Farmers Grid */}
         {!loading && farmers.length > 0 && (
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
             {farmers.map((farmer) => (
               <Card key={farmer.id} className="overflow-hidden hover:shadow-lg transition-shadow bg-white">
                 <div className="relative aspect-video overflow-hidden bg-gray-100">
@@ -274,6 +351,8 @@ export default function FarmersPage() {
               )}
             </Button>
           </div>
+        )}
+          </>
         )}
       </main>
     </div>

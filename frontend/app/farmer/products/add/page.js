@@ -19,6 +19,7 @@ export default function AddProductPage() {
   const API_BASE = process.env.NEXT_PUBLIC_API_URL || ""
 
   const [isLoading, setIsLoading] = useState(false)
+  const [isApproved, setIsApproved] = useState(false) // Add approval status
   const [categories, setCategories] = useState([])
   const [milkCategories, setMilkCategories] = useState([])
 
@@ -47,6 +48,27 @@ export default function AddProductPage() {
       active = false
     }
   }, [API_BASE])
+
+  // Check farmer approval status
+  useEffect(() => {
+    const checkApprovalStatus = async () => {
+      try {
+        const res = await api.get(`${API_BASE}/api/v1/farmers/dashboard-status`)
+        const data = res.data
+        if (data.success) {
+          setIsApproved(data.restrictions?.canAddProducts || false)
+          if (!data.restrictions?.canAddProducts) {
+            toast.error("You need to complete your profile and get approved to add products")
+            router.push("/farmer/profile")
+          }
+        }
+      } catch (err) {
+        toast.error("Failed to check approval status")
+        router.push("/farmer/profile")
+      }
+    }
+    checkApprovalStatus()
+  }, [API_BASE, router])
 
   const selectedCategory = categories.find((c) => String(c.id) === String(selectedCategoryId))
   const isMilkCategory = selectedCategory?.name?.toLowerCase() === "milk"

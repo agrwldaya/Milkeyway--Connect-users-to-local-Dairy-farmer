@@ -6,9 +6,10 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-import { Search, MapPin, Star, Milk, Filter, Loader2, AlertCircle, Users, MessageCircle } from "lucide-react"
+import { Search, MapPin, Star, Milk, Filter, Loader2, AlertCircle, Users, MessageCircle, Map } from "lucide-react"
 import { ConsumerNav } from "@/components/consumer-nav"
 import { api } from "@/lib/utils"
+import ConsumerMapPicker from "@/components/ConsumerMapPicker"
 
 export default function ProductDiscoveryPage() {
   const [searchQuery, setSearchQuery] = useState("")
@@ -19,6 +20,8 @@ export default function ProductDiscoveryPage() {
   const [error, setError] = useState(null)
   const [categories, setCategories] = useState([])
   const [categoriesLoading, setCategoriesLoading] = useState(true)
+  const [showMapView, setShowMapView] = useState(false)
+  const [selectedFarmer, setSelectedFarmer] = useState(null)
 
   // Fetch categories from database
   useEffect(() => {
@@ -106,6 +109,39 @@ export default function ProductDiscoveryPage() {
   const handleSearch = () => {
     if (searchQuery.trim() && location) {
       fetchFarmersByProduct(searchQuery.trim(), location.latitude, location.longitude)
+    }
+  }
+
+  // Handle farmer selection from map
+  const handleFarmerSelect = (farmer) => {
+    setSelectedFarmer(farmer)
+    // Navigate to farmer details page
+    window.location.href = `/consumer/farmer/${farmer.id}`
+  }
+
+  // Handle location change from map
+  const handleLocationChange = (newLocation) => {
+    setLocation(newLocation)
+    if (selectedCategory) {
+      fetchFarmersByCategory(selectedCategory.id, newLocation.latitude, newLocation.longitude)
+    }
+  }
+
+  // Handle category change from map
+  const handleCategoryChange = async (categoryId) => {
+    if (location) {
+      try {
+        setLoading(true)
+        const response = await api.get(`/api/v1/consumers/farmers-by-category?categoryId=${categoryId}&latitude=${location.latitude}&longitude=${location.longitude}&radius=10`)
+        const data = response.data
+        if (data.success) {
+          setFarmers(data.farmers)
+        }
+      } catch (err) {
+        console.error("Error fetching farmers by category:", err)
+      } finally {
+        setLoading(false)
+      }
     }
   }
 
@@ -206,7 +242,17 @@ export default function ProductDiscoveryPage() {
 
         {/* Product Categories */}
         <div className="mb-12">
-          <h2 className="text-2xl font-serif font-bold mb-6">Browse by Product Category</h2>
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-2xl font-serif font-bold">Browse by Product Category</h2>
+            <Button 
+              variant={showMapView ? "default" : "outline"} 
+              size="sm"
+              onClick={() => setShowMapView(!showMapView)}
+            >
+              <Map className="h-4 w-4 mr-2" />
+              {showMapView ? "List View" : "Map View"}
+            </Button>
+          </div>
           {categoriesLoading ? (
             <div className="flex items-center justify-center py-12">
               <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -239,8 +285,23 @@ export default function ProductDiscoveryPage() {
           )}
         </div>
 
+        {/* Map View */}
+        {showMapView && (
+          <div className="mb-8">
+            <ConsumerMapPicker
+              onFarmerSelect={handleFarmerSelect}
+              initialLocation={location}
+              farmers={farmers}
+              categories={categories}
+              onCategoryChange={handleCategoryChange}
+              onLocationChange={handleLocationChange}
+              loading={loading}
+            />
+          </div>
+        )}
+
         {/* Results Section */}
-        {selectedCategory && (
+        {selectedCategory && !showMapView && (
           <div className="mb-12">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-2xl font-serif font-bold">

@@ -7,32 +7,74 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
-import { Upload, X, Camera, Award, MapPin, Phone, Mail, CheckCircle, AlertCircle } from "lucide-react"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Upload, X, Camera, Award, MapPin, Phone, Mail, CheckCircle, AlertCircle, Edit, Save } from "lucide-react"
 import { FarmerNav } from "@/components/farmer-nav"
 import { api } from "@/lib/utils"
 import { toast } from "sonner"
+import LocationPicker from "@/components/LocationPicker"
 
 
 export default function ProfilePage() {
-  const API_BASE = process.env.NEXT_PUBLIC_API_URL || ""
+  const API_BASE = "http://localhost:4000" // Hardcode for testing
   const [isLoading, setIsLoading] = useState(false)
   const [farmerProfile, setFarmerProfile] = useState(null)
+  const [userId, setUserId] = useState(null) // Add userId state
   const [coverImage, setCoverImage] = useState("/farm_cover.jpg")
   const [profileImage, setProfileImage] = useState("/farmer_image.jpg")
   const [farmImages, setFarmImages] = useState([])
-  const [isEditing, setIsEditing] = useState(false);
-   
+  const [isEditing, setIsEditing] = useState(false)
+  
+  // New states for document upload and location update
+  const [showDocumentUpload, setShowDocumentUpload] = useState(false)
+  const [showLocationUpdate, setShowLocationUpdate] = useState(false)
+  const [uploadedFiles, setUploadedFiles] = useState({
+    farmer_proof_doc: null,
+    farm_image: null,
+    farmer_image: null
+  })
+  const [newLocation, setNewLocation] = useState(null)
+
+  // Debug useEffect to monitor state changes
+  useEffect(() => {
+    console.log("showDocumentUpload state changed to:", showDocumentUpload)
+  }, [showDocumentUpload])
+
+  useEffect(() => {
+    console.log("showLocationUpdate state changed to:", showLocationUpdate)
+  }, [showLocationUpdate])
 
   useEffect(() => {
     let active = true
     const fetchProfile = async () => {
       setIsLoading(true)
       try {
-        const res = await api.get(`${API_BASE}/api/v1/farmers/profile`)
-        const data = res.data
+        const res = await fetch(`${API_BASE}/api/v1/farmers/profile`, {
+          method: "GET",
+          credentials: "include",
+          headers: {
+            "Content-Type": "application/json",
+          },
+        })
+        
+        const data = await res.json()
+        console.log("Profile fetch response:", data) // Debug log
+        
+        if (!res.ok) {
+          throw new Error(data?.message || "Failed to load profile")
+        }
+        
         if (!data?.farmerProfile) throw new Error(data?.message || "Failed to load profile")
         if (!active) return
         setFarmerProfile(data.farmerProfile)
+        
+        // Get user ID from the response or extract from profile
+        const userIdFromProfile = data.farmerProfile.id || data.userId
+        console.log("User ID from profile:", userIdFromProfile) // Debug log
+        if (userIdFromProfile) {
+          setUserId(userIdFromProfile)
+          console.log("User ID set to:", userIdFromProfile) // Debug log
+        }
         
         // Set images from profile data
         if (data.farmerProfile.documents) {
@@ -113,16 +155,121 @@ export default function ProfilePage() {
     }
   }
 
-  // const handleFarmImageUpload = (e) => {
-  //   const files = e.target.files
-  //   if (files) {
-  //     const newImages = Array.from(files).map((file) => URL.createObjectURL(file))
-  //     setFarmImages([...farmImages, ...newImages])
-  //   }
-  // }
-
   const removeFarmImage = (index) => {
     setFarmImages(farmImages.filter((_, i) => i !== index))
+  }
+
+  // Document upload functions
+  const handleFileSelect = (fileType, file) => {
+    setUploadedFiles({ ...uploadedFiles, [fileType]: file })
+  }
+
+  const handleDocumentUpload = async () => {
+    console.log("Current userId state:", userId) // Debug log
+    if (!uploadedFiles.farmer_proof_doc) {
+      toast.error("Farmer proof document is required")
+      return
+    }
+
+    if (!userId) {
+      toast.error("User ID not found. Please refresh the page.")
+      return
+    }
+
+    setIsLoading(true)
+    try {
+      const form = new FormData()
+      
+      // Add required farmer proof document
+      form.append("farmer_proof_doc", uploadedFiles.farmer_proof_doc)
+      
+      // Add optional documents if provided
+      if (uploadedFiles.farm_image) {
+        form.append("farm_image", uploadedFiles.farm_image)
+      }
+      if (uploadedFiles.farmer_image) {
+        form.append("farmer_image", uploadedFiles.farmer_image)
+      }
+      
+      console.log("Uploading documents for user ID:", userId)
+      const res = await fetch(`${API_BASE}/api/v1/farmers/submit-proof-docs/${userId}`, {
+        method: "POST",
+        credentials: "include",
+        body: form,
+      })
+      
+      const data = await res.json()
+      console.log("Document upload response:", data)
+      
+      if (!res.ok) {
+        toast.error(data?.message || "Failed to upload documents")
+        return
+      }
+      
+      toast.success("Documents submitted successfully")
+      setShowDocumentUpload(false)
+      setUploadedFiles({ farmer_proof_doc: null, farm_image: null, farmer_image: null })
+      // Refresh profile data
+      window.location.reload()
+    } catch (err) {
+      console.error("Document upload error:", err)
+      toast.error(err?.response?.data?.message || "Failed to upload documents")
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  // Location update functions
+  const handleLocationSelect = (location) => {
+    setNewLocation(location)
+  }
+
+  const handleLocationUpdate = async () => {
+    console.log("Current userId state:", userId) // Debug log
+    if (!newLocation) {
+      toast.error("Please select a location")
+      return
+    }
+
+    if (!userId) {
+      toast.error("User ID not found. Please refresh the page.")
+      return
+    }
+
+    setIsLoading(true)
+    try {
+      console.log("Updating location for user ID:", userId, "with coordinates:", newLocation)
+      const res = await fetch(`${API_BASE}/api/v1/farmers/location/${userId}`, {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          latitude: newLocation.latitude,
+          longitude: newLocation.longitude,
+        }),
+      })
+      
+      const data = await res.json()
+      console.log("Location update response:", data)
+      
+      if (!res.ok) {
+        toast.error(data?.message || "Failed to update location")
+        return
+      }
+      
+      toast.success("Location updated successfully")
+      setShowLocationUpdate(false)
+      setNewLocation(null)
+      // Refresh profile data
+      window.location.reload()
+    } catch (err) {
+      console.error("Location update error:", err)
+      toast.error(err?.response?.data?.message || "Failed to update location")
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   if (isLoading) {
@@ -164,7 +311,7 @@ export default function ProfilePage() {
           <p className="text-muted-foreground">Manage your farm information and showcase your products</p>
         </div>
 
-        <form className="space-y-6">
+        <div className="space-y-6">
           {/* Cover & Profile Image */}
           <Card>
             <CardContent className="p-0">
@@ -314,51 +461,139 @@ export default function ProfilePage() {
             </CardContent>
           </Card>
 
-          {/* Farm Details */}
-          {/* <Card>
-            <CardHeader>
-              <CardTitle>Farm Details</CardTitle>
-              <CardDescription>Provide details about your farm operations</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="established">Established Year</Label>
-                  <Input id="established" type="number" defaultValue="2004" />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="farmSize">Farm Size (in acres)</Label>
-                  <Input id="farmSize" type="number" defaultValue="5" />
-                </div>
-              </div>
-
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="cattle">Number of Cattle</Label>
-                  <Input id="cattle" type="number" defaultValue="15" />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="dailyProduction">Daily Milk Production (Liters)</Label>
-                  <Input id="dailyProduction" type="number" defaultValue="80" />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="specialization">Specialization</Label>
-                <Input id="specialization" defaultValue="A2 Cow Milk, Organic Ghee" />
-              </div>
-            </CardContent>
-          </Card> */}
-
           {/* Documents */}
           <Card>
             <CardHeader>
-              <CardTitle>Documents & Verification</CardTitle>
-              <CardDescription>Your uploaded documents and verification status</CardDescription>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>Documents & Verification</CardTitle>
+                  <CardDescription>Your uploaded documents and verification status</CardDescription>
+                </div>
+                {!farmerProfile.hasSubmittedDocuments && (
+                <Button 
+                  onClick={(e) => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    console.log("Document upload button clicked, current state:", showDocumentUpload)
+                    setShowDocumentUpload(!showDocumentUpload)
+                    console.log("Document upload state changed to:", !showDocumentUpload)
+                  }}
+                  variant="outline"
+                  size="sm"
+                  type="button"
+                >
+                  <Upload className="h-4 w-4 mr-2" />
+                  {showDocumentUpload ? "Cancel" : "Upload Documents"}
+                </Button>
+                )}
+              </div>
             </CardHeader>
             <CardContent className="space-y-4">
+              {!farmerProfile.hasSubmittedDocuments && showDocumentUpload && (
+                <Alert className="border-yellow-200 bg-yellow-50">
+                  <AlertCircle className="h-4 w-4 text-yellow-600" />
+                  <AlertDescription className="text-yellow-800">
+                    <div className="space-y-4">
+                      <p>Please upload your proof documents to complete your profile:</p>
+                      
+                      <div className="space-y-3">
+                        <div className="space-y-2">
+                          <Label htmlFor="farmer_proof_doc">Farmer Proof Document *</Label>
+                          <div 
+                            className="border-2 border-dashed rounded-lg p-4 text-center hover:border-primary transition-colors cursor-pointer"
+                            onClick={() => document.getElementById('farmer_proof_doc').click()}
+                          >
+                            <Upload className="h-6 w-6 mx-auto mb-2 text-muted-foreground" />
+                            <p className="text-sm text-muted-foreground">Click to upload ID proof, license, or certification</p>
+                            <Input 
+                              id="farmer_proof_doc" 
+                              type="file" 
+                              className="hidden" 
+                              onChange={(e) => handleFileSelect("farmer_proof_doc", e.target.files?.[0] || null)} 
+                            />
+                          </div>
+                          {uploadedFiles.farmer_proof_doc && (
+                            <div className="p-2 bg-green-50 border border-green-200 rounded-lg">
+                              <div className="flex items-center space-x-2 text-green-800">
+                                <CheckCircle className="h-4 w-4" />
+                                <span className="text-sm font-medium">Selected: {uploadedFiles.farmer_proof_doc.name}</span>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label htmlFor="farm_image">Farm Image (Optional)</Label>
+                          <div 
+                            className="border-2 border-dashed rounded-lg p-4 text-center hover:border-primary transition-colors cursor-pointer"
+                            onClick={() => document.getElementById('farm_image').click()}
+                          >
+                            <Upload className="h-6 w-6 mx-auto mb-2 text-muted-foreground" />
+                            <p className="text-sm text-muted-foreground">Click to upload farm photo</p>
+                            <Input 
+                              id="farm_image" 
+                              type="file" 
+                              accept="image/*"
+                              className="hidden" 
+                              onChange={(e) => handleFileSelect("farm_image", e.target.files?.[0] || null)} 
+                            />
+                          </div>
+                          {uploadedFiles.farm_image && (
+                            <div className="p-2 bg-green-50 border border-green-200 rounded-lg">
+                              <div className="flex items-center space-x-2 text-green-800">
+                                <CheckCircle className="h-4 w-4" />
+                                <span className="text-sm font-medium">Selected: {uploadedFiles.farm_image.name}</span>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label htmlFor="farmer_image">Farmer Photo (Optional)</Label>
+                          <div 
+                            className="border-2 border-dashed rounded-lg p-4 text-center hover:border-primary transition-colors cursor-pointer"
+                            onClick={() => document.getElementById('farmer_image').click()}
+                          >
+                            <Upload className="h-6 w-6 mx-auto mb-2 text-muted-foreground" />
+                            <p className="text-sm text-muted-foreground">Click to upload your photo</p>
+                            <Input 
+                              id="farmer_image" 
+                              type="file" 
+                              accept="image/*"
+                              className="hidden" 
+                              onChange={(e) => handleFileSelect("farmer_image", e.target.files?.[0] || null)} 
+                            />
+                          </div>
+                          {uploadedFiles.farmer_image && (
+                            <div className="p-2 bg-green-50 border border-green-200 rounded-lg">
+                              <div className="flex items-center space-x-2 text-green-800">
+                                <CheckCircle className="h-4 w-4" />
+                                <span className="text-sm font-medium">Selected: {uploadedFiles.farmer_image.name}</span>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="flex gap-3 pt-4">
+                        <Button 
+                          onClick={(e) => {
+                            e.preventDefault()
+                            e.stopPropagation()
+                            handleDocumentUpload()
+                          }}
+                          disabled={!uploadedFiles.farmer_proof_doc || isLoading}
+                          className="flex-1"
+                          type="button"
+                        >
+                          {isLoading ? "Uploading..." : "Submit Documents"}
+                        </Button>
+                        </div>
+                      </div>
+                    </div>
+                  </AlertDescription>
+                </Alert>
+              )}
+
               {farmerProfile.documents ? (
                 <div className="space-y-3">
                   {farmerProfile.documents.farmer_proof_doc_url && (
@@ -393,60 +628,93 @@ export default function ProfilePage() {
                   )}
                 </div>
               ) : (
-                <div className="text-center py-8">
-                  <p className="text-muted-foreground">No documents uploaded yet</p>
-                </div>
+                !showDocumentUpload && (
+                  <div className="text-center py-8">
+                    <p className="text-muted-foreground">No documents uploaded yet</p>
+                  </div>
+                )
               )}
             </CardContent>
           </Card>
 
-          {/* Farm Images */}
-          {/* <Card>
+          {/* Location Update */}
+          <Card>
             <CardHeader>
-              <CardTitle>Farm Gallery</CardTitle>
-              <CardDescription>Showcase your farm with photos (Max 10 images)</CardDescription>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>Farm Location</CardTitle>
+                  <CardDescription>Your farm's geographical location</CardDescription>
+                </div>
+                <Button 
+                  onClick={(e) => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    console.log("Location update button clicked, current state:", showLocationUpdate)
+                    setShowLocationUpdate(!showLocationUpdate)
+                    console.log("Location update state changed to:", !showLocationUpdate)
+                  }}
+                  variant="outline"
+                  size="sm"
+                  type="button"
+                >
+                  <MapPin className="h-4 w-4 mr-2" />
+                  {showLocationUpdate ? "Cancel" : "Update Location"}
+                </Button>
+              </div>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                {farmImages.map((image, index) => (
-                  <div key={index} className="relative aspect-video rounded-lg overflow-hidden border">
-                    <img
-                      src={image || "/placeholder.svg"}
-                      alt={`Farm ${index + 1}`}
-                      className="w-full h-full object-cover"
-                    />
-                    <Button
-                      type="button"
-                      variant="destructive"
-                      size="sm"
-                      className="absolute top-2 right-2 h-6 w-6 p-0"
-                      onClick={() => removeFarmImage(index)}
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
+              {showLocationUpdate && (
+                <Alert className="border-blue-200 bg-blue-50">
+                  <MapPin className="h-4 w-4 text-blue-600" />
+                  <AlertDescription className="text-blue-800">
+                    <div className="space-y-4">
+                      <p>Update your farm location using GPS or map selection:</p>
+                      <LocationPicker 
+                        onLocationSelect={handleLocationSelect}
+                        initialLocation={farmerProfile.coordinates.latitude && farmerProfile.coordinates.longitude ? farmerProfile.coordinates : null}
+                      />
+                      <div className="flex gap-3 pt-4">
+                        <Button 
+                          onClick={(e) => {
+                            e.preventDefault()
+                            e.stopPropagation()
+                            handleLocationUpdate()
+                          }}
+                          disabled={!newLocation || isLoading}
+                          className="flex-1"
+                          type="button"
+                        >
+                          {isLoading ? "Updating..." : "Update Location"}
+                        </Button>
+                      </div>
+                    </div>
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              <div className="space-y-2">
+                <Label>Current Location</Label>
+                <div className="p-3 border rounded-lg bg-muted/50">
+                  <div className="flex items-center gap-2 mb-2">
+                    <MapPin className="h-4 w-4 text-muted-foreground" />
+                    <span className="font-medium">Coordinates</span>
                   </div>
-                ))}
-                {farmImages.length < 10 && (
-                  <label className="aspect-video rounded-lg border-2 border-dashed border-muted-foreground/25 hover:border-muted-foreground/50 transition-colors cursor-pointer flex flex-col items-center justify-center gap-2">
-                    <Upload className="h-8 w-8 text-muted-foreground" />
-                    <span className="text-xs text-muted-foreground text-center px-2">Add Photo</span>
-                    <input type="file" className="hidden" accept="image/*" onChange={handleFarmImageUpload} multiple />
-                  </label>
-                )}
+                  <p className="text-sm text-muted-foreground">
+                    Latitude: {farmerProfile.coordinates.latitude || "Not set"}
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    Longitude: {farmerProfile.coordinates.longitude || "Not set"}
+                  </p>
+                  {farmerProfile.coordinates.latitude && farmerProfile.coordinates.longitude && (
+                    <p className="text-xs text-muted-foreground mt-2">
+                      Delivery Radius: {farmerProfile.deliveryRadius} km
+                    </p>
+                  )}
+                </div>
               </div>
             </CardContent>
-          </Card> */}
-
-          {/* Action Buttons */}
-          {/* <div className="flex flex-col sm:flex-row gap-4 justify-end">
-            <Button type="button" variant="outline" className="w-full sm:w-auto bg-transparent">
-              Edit Profile
-            </Button>
-            <Button  type="button" className="bg-primary hover:bg-primary/90 w-full sm:w-auto">
-              Update Documents
-            </Button>
-          </div> */}
-        </form>
+          </Card>
+        </div>
       </main>
     </div>
   )

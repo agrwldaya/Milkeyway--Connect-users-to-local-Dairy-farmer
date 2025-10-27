@@ -9,6 +9,8 @@ import {
   getFarmersByCategory,
   getConsumerProfile,
   getConsumerConnectionData,
+  updateConsumerLocation,
+  updateConsumerLocationSignup,
 } from "../controllers/consumerController.js";
 import { verifyOtp } from "../controllers/autocontroller.js";
 import { authMiddleware, verifyConsumer } from "../middleware/authMiddleWare.js";
@@ -23,6 +25,9 @@ consumerRouter.post("/verify", verifyOtp);
 
 // STEP 3 - Complete consumer profile (personal + farm details)
 consumerRouter.post("/profile/:user_id", completeConsumerProfile);
+
+// STEP 4 - Update location during signup (no auth required)
+consumerRouter.put("/location-signup", updateConsumerLocationSignup);
 
 // // STEP 4 - Upload documents (variation docs, ID proof, etc.)
 // consumerRouter.post("/upload-docs/:user_id", uploadDocuments);
@@ -46,6 +51,9 @@ consumerRouter.get("/farmers-by-category", getFarmersByCategory);
 
 // Get consumer profile
 consumerRouter.get("/profile", authMiddleware, verifyConsumer, getConsumerProfile);
+
+// Update consumer location
+consumerRouter.put("/location", authMiddleware, verifyConsumer, updateConsumerLocation);
 
 // get consumers connection data for dashboard
 consumerRouter.get("/connection-data", authMiddleware, verifyConsumer, getConsumerConnectionData);

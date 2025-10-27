@@ -42,8 +42,8 @@ if (existing.rows.length > 0 && !existing.rows[0].is_verified) {
   await pool.query(
     `UPDATE users 
      SET name=$1, email=$2, phone=$3, password=$4, role=$5, status=$6, pincode=$7, country=$8, state=$9, city=$10 
-     WHERE id=$7`,
-    [name, email, phone, hashedPassword, "consumer", "draft", existing.rows[0].id, pincode, country, state, city]
+     WHERE id=$11`,
+    [name, email, phone, hashedPassword, "consumer", "draft", pincode, country, state, city, existing.rows[0].id]
   );
   consumerId = existing.rows[0].id;
 } else {
@@ -92,8 +92,8 @@ export const completeConsumerProfile = async (req, res) => {
     } = req.body;
 
     // Validate input
-    if (!user_id || !address || !latitude || !longitude || !preferred_radius_km) {
-      return res.status(400).json({ message: "All fields are required" });
+    if (!user_id || !address || !preferred_radius_km) {
+      return res.status(400).json({ message: "User ID, address, and preferred radius are required" });
     }
 
     // Check if consumer user exists
@@ -120,7 +120,7 @@ export const completeConsumerProfile = async (req, res) => {
         `UPDATE consumer_profiles
          SET address=$1, preferred_radius_km=$2, latitude=$3, longitude=$4, status=$5
          WHERE user_id=$6`,
-        [address, preferred_radius_km, latitude, longitude, "draft", user_id]
+        [address, preferred_radius_km, latitude || null, longitude || null, "draft", user_id]
        );
     }
     else {
@@ -128,44 +128,21 @@ export const completeConsumerProfile = async (req, res) => {
     await pool.query(
       `INSERT INTO consumer_profiles (user_id, address, preferred_radius_km, latitude, longitude, status) 
        VALUES ($1, $2, $3, $4, $5, $6)`,
-      [user_id, address, preferred_radius_km, latitude, longitude, "active"]
+      [user_id, address, preferred_radius_km, latitude || null, longitude || null, "draft"]
     );
 }
-    await pool.query("update users set status = $1 where id=$2", ["active", user_id]);
-
-    // Generate tokens
-    const accessToken = generateAccessToken(user);
-    const refreshToken = generateRefreshToken(user);
-
-    // Save refreshToken in DB
-    await pool.query("UPDATE users SET refresh_token=$1 WHERE id=$2", [refreshToken, user_id]);
-
-    // Set access token cookie (short-lived)
-    res.cookie("token", accessToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
-      path: "/",
-      maxAge: 2 * 60 * 60 * 1000, // 2 hours
-    });
-
-    // Set refresh token cookie (long-lived, scoped to refresh endpoint)
-    res.cookie("refreshToken", refreshToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
-      path: "/refresh",
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-    });
+    await pool.query("update users set status = $1 where id=$2", ["draft", user_id]);
 
     res.status(200).json({
-      message: "Profile completed successfully",
+      message: "Profile completed successfully. Please set your location to complete registration.",
       user: {
         id: user_id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-      },
+        name: user.rows[0].name,
+        email: user.rows[0].email,
+        phone: user.rows[0].phone,
+        role: user.rows[0].role,
+        status: "draft"
+      }
     });
 
   } catch (error) {
@@ -631,6 +608,251 @@ export const getConsumerProfile = async (req, res) => {
   }
 };
 
+// Update consumer location during signup (no auth required)
+export const updateConsumerLocationSignup = async (req, res) => {
+  try {
+    const { user_id, latitude, longitude, address } = req.body;
+
+    if (!user_id) {
+      return res.status(400).json({ message: "User ID is required" });
+    }
+
+    if (!latitude || !longitude) {
+      return res.status(400).json({ message: "Latitude and longitude are required" });
+    }
+
+    // Validate coordinates
+    const lat = parseFloat(latitude);
+    const lng = parseFloat(longitude);
+
+    if (isNaN(lat) || isNaN(lng)) {
+      return res.status(400).json({ message: "Invalid latitude or longitude values" });
+    }
+
+    if (lat < -90 || lat > 90) {
+      return res.status(400).json({ message: "Latitude must be between -90 and 90" });
+    }
+
+    if (lng < -180 || lng > 180) {
+      return res.status(400).json({ message: "Longitude must be between -180 and 180" });
+    }
+
+    // Check if user exists and is verified
+    const user = await pool.query(
+      "SELECT * FROM users WHERE id = $1 AND role = $2 AND is_verified = $3",
+      [user_id, "consumer", true]
+    );
+
+    if (user.rows.length === 0) {
+      return res.status(404).json({ message: "Consumer not found or not verified" });
+    }
+
+    // Check if consumer profile exists
+    const existingProfile = await pool.query(
+      "SELECT * FROM consumer_profiles WHERE user_id = $1", 
+      [user_id]
+    );
+
+    if (existingProfile.rows.length === 0) {
+      return res.status(404).json({ message: "Consumer profile not found. Please complete your profile first." });
+    }
+
+    // Update existing profile with location
+    await pool.query(
+      `UPDATE consumer_profiles 
+       SET latitude = $1, longitude = $2, address = $3, updated_at = NOW() 
+       WHERE user_id = $4`,
+      [lat, lng, address || null, user_id]
+    );
+
+    // Update user status to active when location is set (completing signup)
+    await pool.query("UPDATE users SET status = $1 WHERE id = $2", ["active", user_id]);
+
+    // Initialize consumer activity summary if it doesn't exist
+    const existingSummary = await pool.query(
+      "SELECT * FROM consumer_activity_summary WHERE consumer_id = $1",
+      [user_id]
+    );
+
+    if (existingSummary.rows.length === 0) {
+      await pool.query(
+        `INSERT INTO consumer_activity_summary (consumer_id, total_requests_sent, accepted_requests, rejected_requests, pending_requests, active_connections, request_success_rate) 
+         VALUES ($1, 0, 0, 0, 0, 0, 0.00)`,
+        [user_id]
+      );
+    }
+
+    // Get reverse geocoding data for better address
+    let locationData = null;
+    try {
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`
+      );
+      locationData = await response.json();
+    } catch (error) {
+      console.error("Reverse geocoding error:", error);
+    }
+
+    // Generate tokens for completed signup
+    const accessToken = generateAccessToken(user.rows[0]);
+    const refreshToken = generateRefreshToken(user.rows[0]);
+
+    // Save refreshToken in DB
+    await pool.query("UPDATE users SET refresh_token=$1 WHERE id=$2", [refreshToken, user_id]);
+
+    // Set access token cookie (short-lived)
+    res.cookie("token", accessToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+      path: "/",
+      maxAge: 2 * 60 * 60 * 1000, // 2 hours
+    });
+
+    // Set refresh token cookie (long-lived, scoped to refresh endpoint)
+    res.cookie("refreshToken", refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+      path: "/refresh",
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    });
+
+    res.status(200).json({
+      success: true,
+      message: "Location updated successfully and signup completed!",
+      location: {
+        latitude: lat,
+        longitude: lng,
+        address: address || locationData?.display_name || null,
+        locationData: locationData
+      }
+    });
+
+  } catch (error) {
+    console.error("Update Consumer Location Signup Error:", error);
+    res.status(500).json({ 
+      success: false, 
+      message: "Internal server error",
+      error: error.message 
+    });
+  }
+};
+
+// Update consumer location
+export const updateConsumerLocation = async (req, res) => {
+  try {
+    const consumerId = req.user.user_id;
+    const { latitude, longitude, address } = req.body;
+
+    if (!consumerId) {
+      return res.status(400).json({ message: "Consumer ID is required" });
+    }
+
+    if (!latitude || !longitude) {
+      return res.status(400).json({ message: "Latitude and longitude are required" });
+    }
+
+    // Validate coordinates
+    const lat = parseFloat(latitude);
+    const lng = parseFloat(longitude);
+
+    if (isNaN(lat) || isNaN(lng)) {
+      return res.status(400).json({ message: "Invalid latitude or longitude values" });
+    }
+
+    if (lat < -90 || lat > 90) {
+      return res.status(400).json({ message: "Latitude must be between -90 and 90" });
+    }
+
+    if (lng < -180 || lng > 180) {
+      return res.status(400).json({ message: "Longitude must be between -180 and 180" });
+    }
+
+    // Check if consumer profile exists
+    const existingProfile = await pool.query(
+      "SELECT * FROM consumer_profiles WHERE user_id = $1", 
+      [consumerId]
+    );
+
+    if (existingProfile.rows.length === 0) {
+      // Create new consumer profile
+      await pool.query(
+        `INSERT INTO consumer_profiles (user_id, latitude, longitude, address, created_at, updated_at) 
+         VALUES ($1, $2, $3, $4, NOW(), NOW())`,
+        [consumerId, lat, lng, address || null]
+      );
+    } else {
+      // Update existing profile
+      await pool.query(
+        `UPDATE consumer_profiles 
+         SET latitude = $1, longitude = $2, address = $3, updated_at = NOW() 
+         WHERE user_id = $4`,
+        [lat, lng, address || null, consumerId]
+      );
+    }
+
+    // Update user status to active when location is set (completing signup)
+    await pool.query("UPDATE users SET status = $1 WHERE id = $2", ["active", consumerId]);
+
+    // Get reverse geocoding data for better address
+    let locationData = null;
+    try {
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`
+      );
+      locationData = await response.json();
+    } catch (error) {
+      console.error("Reverse geocoding error:", error);
+    }
+
+    // Generate tokens for completed signup
+    const user = await pool.query("SELECT * FROM users WHERE id = $1", [consumerId]);
+    const accessToken = generateAccessToken(user.rows[0]);
+    const refreshToken = generateRefreshToken(user.rows[0]);
+
+    // Save refreshToken in DB
+    await pool.query("UPDATE users SET refresh_token=$1 WHERE id=$2", [refreshToken, consumerId]);
+
+    // Set access token cookie (short-lived)
+    res.cookie("token", accessToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+      path: "/",
+      maxAge: 2 * 60 * 60 * 1000, // 2 hours
+    });
+
+    // Set refresh token cookie (long-lived, scoped to refresh endpoint)
+    res.cookie("refreshToken", refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+      path: "/refresh",
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    });
+
+    res.status(200).json({
+      success: true,
+      message: "Location updated successfully",
+      location: {
+        latitude: lat,
+        longitude: lng,
+        address: address || locationData?.display_name || null,
+        locationData: locationData
+      }
+    });
+
+  } catch (error) {
+    console.error("Update Consumer Location Error:", error);
+    res.status(500).json({ 
+      success: false, 
+      message: "Internal server error",
+      error: error.message 
+    });
+  }
+};
+
 // get consumer connection data for dashboard
 export const getConsumerConnectionData = async (req, res) => {
   try {
@@ -638,16 +860,39 @@ export const getConsumerConnectionData = async (req, res) => {
     if(!consumerId) {
       return res.status(400).json({ message: "Consumer ID is required" });
     }
+    
     const connectionData = await pool.query("SELECT * FROM consumer_activity_summary WHERE consumer_id = $1", [consumerId]);
+    
+    // Check if data exists for this consumer
+    if (connectionData.rows.length === 0) {
+      // Return default values if no data exists
+      const defaultResponse = {
+        totalRequests: 0,
+        totalActiveConnections: 0,
+        totalAcceptedRequests: 0,
+        totalRejectedRequests: 0,
+        totalPendingRequests: 0,
+        requestSuccessRate: 0
+      };
+      return res.status(200).json({ 
+        message: "Consumer connection data fetched successfully", 
+        connectionData: defaultResponse 
+      });
+    }
+    
     const response = {
-      totalRequests: connectionData.rows[0].total_requests_sent,
-      totalActiveConnections: connectionData.rows[0].active_connections,
-      totalAcceptedRequests: connectionData.rows[0].accepted_requests,
-      totalRejectedRequests: connectionData.rows[0].rejected_requests,
-      totalPendingRequests: connectionData.rows[0].pending_requests,
-      requestSuccessRate: connectionData.rows[0].request_success_rate
+      totalRequests: connectionData.rows[0].total_requests_sent || 0,
+      totalActiveConnections: connectionData.rows[0].active_connections || 0,
+      totalAcceptedRequests: connectionData.rows[0].accepted_requests || 0,
+      totalRejectedRequests: connectionData.rows[0].rejected_requests || 0,
+      totalPendingRequests: connectionData.rows[0].pending_requests || 0,
+      requestSuccessRate: connectionData.rows[0].request_success_rate || 0
     };
-    res.status(200).json({ message: "Consumer connection data fetched successfully", connectionData: response });
+    
+    res.status(200).json({ 
+      message: "Consumer connection data fetched successfully", 
+      connectionData: response 
+    });
   }
   catch (error) {
     console.error("Get Consumer Connection Data Error:", error);
