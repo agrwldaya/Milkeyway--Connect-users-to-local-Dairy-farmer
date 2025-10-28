@@ -19,6 +19,7 @@ import {
   Menu,
   Bell,
   Activity,
+  Star,
 } from "lucide-react"
 
 export function ConsumerNav() {
@@ -30,6 +31,13 @@ export function ConsumerNav() {
   const handleLogout = async () => {
     try {
       await api.post("/api/v1/auth/logout")
+      
+      // Clear filter data from localStorage
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('farmerFilters')
+        localStorage.removeItem('showFarmerFilters')
+      }
+      
       toast.success("Logged out")
     } finally {
       router.push("/")
@@ -42,6 +50,7 @@ export function ConsumerNav() {
     { href: "/consumer/products", label: "Find by Product", icon: Milk },
     { href: "/consumer/farmers", label: "All Farmers", icon: Users },
     { href: "/consumer/connections", label: "My Connections", icon: MessageCircle },
+    { href: "/consumer/reviews", label: "My Reviews", icon: Star },
     { href: "/consumer/requests", label: "My Requests", icon: Activity },
   ]
 

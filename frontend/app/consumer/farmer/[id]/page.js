@@ -16,6 +16,10 @@ import { MapPin, Star, Heart, Phone, Mail, Award, Truck, ShoppingCart, ChevronLe
 import { ConsumerNav } from "@/components/consumer-nav"
 import { toast } from "sonner"
 import { api } from "@/lib/utils"
+import ReviewList from "@/components/ReviewList"
+import ReviewStats from "@/components/ReviewStats"
+import ConnectionReviewForm from "@/components/ConnectionReviewForm"
+import { reviewApi } from "@/lib/reviewApi"
 
 export default function FarmerProfilePage() {
   const params = useParams()
@@ -35,6 +39,10 @@ export default function FarmerProfilePage() {
     productInterest: ''
   })
   const [formErrors, setFormErrors] = useState({})
+  const [showReviewForm, setShowReviewForm] = useState(false)
+  const [currentUserId, setCurrentUserId] = useState(null)
+  const [connectionId, setConnectionId] = useState(null)
+  const [existingReview, setExistingReview] = useState(null)
 
   // Reset form when dialog closes
   const handleDialogClose = (open) => {
@@ -51,6 +59,21 @@ export default function FarmerProfilePage() {
       setFormErrors({})
     }
   }
+
+  // Get current user ID
+  useEffect(() => {
+    const getCurrentUser = async () => {
+      try {
+        const response = await api.get('/api/v1/consumers/profile')
+        if (response.data.success) {
+          setCurrentUserId(response.data.consumer.id)
+        }
+      } catch (error) {
+        console.error('Error getting current user:', error)
+      }
+    }
+    getCurrentUser()
+  }, [])
 
   // Check connection status
    
@@ -89,6 +112,49 @@ export default function FarmerProfilePage() {
       fetchFarmerDetails()
     }
   }, [params.id])
+
+  // Check for existing review and get connection ID
+  useEffect(() => {
+    const checkReviewAndConnection = async () => {
+      if (!farmer || !currentUserId) return;
+
+      try {
+        // Get user's reviews to check if they already reviewed this farmer
+        const reviewsResponse = await reviewApi.getConsumerReviews();
+        const userReviews = reviewsResponse.reviews || [];
+        const existingReview = userReviews.find(review => review.farmer_id === farmer.id);
+        setExistingReview(existingReview);
+
+        // Get connection ID if connected
+        if (isConnected) {
+          const connectionsResponse = await fetch('/api/v1/connections/my-connections', {
+            credentials: 'include'
+          });
+          const connectionsData = await connectionsResponse.json();
+          const connection = connectionsData.connections?.find(conn => conn.farmer_id === farmer.id);
+          if (connection) {
+            setConnectionId(connection.connection_id);
+          }
+        }
+      } catch (error) {
+        console.error('Error checking review and connection:', error);
+      }
+    };
+
+    checkReviewAndConnection();
+  }, [farmer, currentUserId, isConnected]);
+
+  // Handle review submission
+  const handleReviewSubmitted = () => {
+    setShowReviewForm(false);
+    setExistingReview(null);
+    // Optionally refresh farmer data to show updated ratings
+    window.location.reload(); // Simple refresh for now
+  };
+
+  const handleReviewCancel = () => {
+    setShowReviewForm(false);
+  };
   
   // Form validation
   const validateForm = () => {
@@ -223,26 +289,6 @@ export default function FarmerProfilePage() {
     )
   }
 
-  const reviews = [
-    {
-      name: "Priya Sharma",
-      rating: 5,
-      date: "2 days ago",
-      comment: "Excellent quality products! Very fresh and the delivery is always on time.",
-    },
-    {
-      name: "Amit Patel",
-      rating: 5,
-      date: "1 week ago",
-      comment: "Best dairy farm in the area. Very professional and the products are top-notch.",
-    },
-    {
-      name: "Sneha Reddy",
-      rating: 4,
-      date: "2 weeks ago",
-      comment: "Good quality milk. My family loves it. Highly recommended!",
-    },
-  ]
 
   return (
     <div className="min-h-screen bg-gray-50 px-2">
@@ -306,7 +352,7 @@ export default function FarmerProfilePage() {
                           <Star 
                             key={i}
                             className={`h-3 w-3 sm:h-4 sm:w-4 ${
-                              i < Math.floor(farmer.rating || 4.5) 
+                              i < Math.floor(Number(farmer.rating) || 0) 
                                 ? "fill-yellow-400 text-yellow-400" 
                                 : "text-gray-300"
                             }`} 
@@ -314,7 +360,7 @@ export default function FarmerProfilePage() {
                         ))}
                       </div>
                       <span className="text-xs sm:text-sm font-semibold text-gray-700">
-                        {farmer.rating?.toFixed(1) || '4.5'}
+                        {(Number(farmer.rating) || 0).toFixed(1)}
                       </span>
                       <span className="text-xs text-gray-500 hidden sm:inline">
                         ({farmer.reviews || 0} reviews)
@@ -367,7 +413,7 @@ export default function FarmerProfilePage() {
                             <Star 
                               key={i}
                               className={`h-4 w-4 sm:h-5 sm:w-5 ${
-                                i < Math.floor(farmer.rating || 4.5) 
+                                i < Math.floor(farmer.rating || 0) 
                                   ? "fill-yellow-400 text-yellow-400" 
                                   : "text-gray-300"
                               }`} 
@@ -375,7 +421,7 @@ export default function FarmerProfilePage() {
                           ))}
                         </div>
                         <span className="font-bold text-base sm:text-lg text-gray-800">
-                          {farmer.rating?.toFixed(1) || '4.5'}
+                          {(Number(farmer.rating) || 0).toFixed(1)}
                         </span>
                         <span className="text-gray-500 text-sm">
                           ({farmer.reviews || 0} reviews)
@@ -720,7 +766,7 @@ export default function FarmerProfilePage() {
               Products ({farmer.products?.length || 0})
             </TabsTrigger>
             <TabsTrigger value="reviews" className="flex-1 sm:flex-none text-sm sm:text-base">
-              Reviews ({reviews.length})
+              Reviews
             </TabsTrigger>
           </TabsList>
 
@@ -781,35 +827,39 @@ export default function FarmerProfilePage() {
           </TabsContent>
 
           <TabsContent value="reviews">
-            <Card className="bg-white rounded-xl sm:rounded-2xl">
-              <CardContent className="p-4 sm:p-6 lg:p-8">
-                <div className="space-y-4 sm:space-y-6">
-                  {reviews.map((review, index) => (
-                    <div key={index} className="pb-4 sm:pb-6 border-b last:border-0">
-                      <div className="flex items-start justify-between mb-2">
-                        <div className="flex-1">
-                          <p className="font-semibold text-sm sm:text-base mb-1">{review.name}</p>
-                          <div className="flex items-center gap-2 mb-2">
-                            <div className="flex">
-                              {[...Array(5)].map((_, i) => (
-                                <Star
-                                  key={i}
-                                  className={`h-3 w-3 sm:h-4 sm:w-4 ${
-                                    i < review.rating ? "fill-yellow-400 text-yellow-400" : "text-gray-300"
-                                  }`}
-                                />
-                              ))}
-                            </div>
-                            <span className="text-xs sm:text-sm text-muted-foreground">{review.date}</span>
-                          </div>
-                        </div>
-                      </div>
-                      <p className="text-muted-foreground leading-relaxed text-sm sm:text-base">{review.comment}</p>
-                    </div>
-                  ))}
+            <div className="space-y-6">
+              {/* Review Statistics */}
+              <ReviewStats farmerId={params.id} />
+              
+              {/* Review Form - Only show if connected */}
+              {isConnected && !showReviewForm && (
+                <div className="flex justify-end">
+                  <Button onClick={() => setShowReviewForm(true)}>
+                    {existingReview ? 'Edit Review' : 'Write a Review'}
+                  </Button>
                 </div>
-              </CardContent>
-            </Card>
+              )}
+              
+              {/* Review Form */}
+              {showReviewForm && (
+                <ConnectionReviewForm
+                  farmerId={params.id}
+                  farmerName={farmer?.farm_name}
+                  connectionId={connectionId}
+                  existingReview={existingReview}
+                  onReviewSubmitted={handleReviewSubmitted}
+                  onCancel={handleReviewCancel}
+                />
+              )}
+              
+              {/* Review List */}
+              <ReviewList
+                farmerId={params.id}
+                showAddReview={isConnected && !showReviewForm}
+                onAddReview={() => setShowReviewForm(true)}
+                currentUserId={currentUserId}
+              />
+            </div>
           </TabsContent>
         </Tabs>
       </main>

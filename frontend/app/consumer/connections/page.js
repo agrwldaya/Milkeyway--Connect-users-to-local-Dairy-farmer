@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { useRouter } from 'next/navigation';
+ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -18,16 +19,27 @@ import {
   Calendar,
   AlertCircle,
   UserCheck,
-  UserX
+  UserX,
+  User,
+  Star,
+  Edit
 } from 'lucide-react';
 import { ConsumerNav } from '@/components/consumer-nav';
+import ConnectionReviewForm from '@/components/ConnectionReviewForm';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { reviewApi } from '@/lib/reviewApi';
 
 export default function MyConnectionsPage() {
+  const router = useRouter();
   const [activeConnections, setActiveConnections] = useState([]);
   const [connectionRequests, setConnectionRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState('connections');
+  const [reviewDialogOpen, setReviewDialogOpen] = useState(false);
+  const [selectedConnection, setSelectedConnection] = useState(null);
+  const [existingReview, setExistingReview] = useState(null);
+  const [reviews, setReviews] = useState({});
 
   useEffect(() => {
     fetchConnectionsData();
@@ -99,6 +111,62 @@ export default function MyConnectionsPage() {
 
   const getInitials = (name) => {
     return name.split(' ').map(n => n[0]).join('').toUpperCase();
+  };
+
+  const fetchExistingReview = async (farmerId) => {
+    try {
+      const response = await reviewApi.getConsumerReviews();
+      const userReviews = response.reviews || [];
+      const existingReview = userReviews.find(review => review.farmer_id === farmerId);
+      return existingReview;
+    } catch (error) {
+      console.error('Error fetching existing review:', error);
+      return null;
+    }
+  };
+
+  const handleReviewClick = async (connection) => {
+    setSelectedConnection(connection);
+    
+    // Check if user already has a review for this farmer
+    const existingReview = await fetchExistingReview(connection.farmer_id);
+    setExistingReview(existingReview);
+    
+    setReviewDialogOpen(true);
+  };
+
+  const handleReviewSubmitted = () => {
+    setReviewDialogOpen(false);
+    setSelectedConnection(null);
+    setExistingReview(null);
+    // Optionally refresh the connections data
+    fetchConnectionsData();
+  };
+
+  const handleReviewCancel = () => {
+    setReviewDialogOpen(false);
+    setSelectedConnection(null);
+    setExistingReview(null);
+  };
+
+  const handleCancelRequest = async (requestId) => {
+    if (window.confirm('Are you sure you want to cancel this connection request?')) {
+      try {
+        const response = await fetch(`/api/v1/connections/requests/${requestId}`, {
+          method: 'DELETE',
+          credentials: 'include'
+        });
+        
+        if (response.ok) {
+          // Refresh the connections data
+          fetchConnectionsData();
+        } else {
+          console.error('Failed to cancel request');
+        }
+      } catch (error) {
+        console.error('Error canceling request:', error);
+      }
+    }
   };
 
   if (loading) {
@@ -232,6 +300,26 @@ export default function MyConnectionsPage() {
                     </div>
                     <Separator className="my-3 sm:my-4" />
                     <div className="flex flex-col sm:flex-row gap-2">
+                      <Button 
+                        variant="default" 
+                        size="sm" 
+                        className="flex items-center justify-center gap-2 flex-1 sm:flex-none"
+                        onClick={() => router.push(`/consumer/farmer/${connection.farmer_id}`)}
+                      >
+                        <User className="h-4 w-4" />
+                        <span className="hidden xs:inline">View Profile</span>
+                        <span className="xs:hidden">Profile</span>
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="flex items-center justify-center gap-2 flex-1 sm:flex-none"
+                        onClick={() => handleReviewClick(connection)}
+                      >
+                        <Star className="h-4 w-4" />
+                        <span className="hidden xs:inline">Write Review</span>
+                        <span className="xs:hidden">Review</span>
+                      </Button>
                       <Button variant="outline" size="sm" className="flex items-center justify-center gap-2 flex-1 sm:flex-none">
                         <MessageSquare className="h-4 w-4" />
                         <span className="hidden xs:inline">Message</span>
@@ -327,6 +415,31 @@ export default function MyConnectionsPage() {
                         )}
                       </div>
                     </div>
+                    <Separator className="my-3 sm:my-4" />
+                    <div className="flex flex-col sm:flex-row gap-2">
+                      <Button 
+                        variant="default" 
+                        size="sm" 
+                        className="flex items-center justify-center gap-2 flex-1 sm:flex-none"
+                        onClick={() => router.push(`/consumer/farmer/${request.farmer_id}`)}
+                      >
+                        <User className="h-4 w-4" />
+                        <span className="hidden xs:inline">View Profile</span>
+                        <span className="xs:hidden">Profile</span>
+                      </Button>
+                      {request.status === 'pending' && (
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          className="flex items-center justify-center gap-2 flex-1 sm:flex-none"
+                          onClick={() => handleCancelRequest(request.id)}
+                        >
+                          <XCircle className="h-4 w-4" />
+                          <span className="hidden xs:inline">Cancel Request</span>
+                          <span className="xs:hidden">Cancel</span>
+                        </Button>
+                      )}
+                    </div>
                   </CardContent>
                 </Card>
               ))}
@@ -335,6 +448,27 @@ export default function MyConnectionsPage() {
         </TabsContent>
       </Tabs>
       </main>
+
+      {/* Review Dialog */}
+      <Dialog open={reviewDialogOpen} onOpenChange={setReviewDialogOpen}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              {existingReview ? 'Edit Review' : 'Write a Review'}
+            </DialogTitle>
+          </DialogHeader>
+          {selectedConnection && (
+            <ConnectionReviewForm
+              farmerId={selectedConnection.farmer_id}
+              farmerName={selectedConnection.farmer_name}
+              connectionId={selectedConnection.connection_id}
+              existingReview={existingReview}
+              onReviewSubmitted={handleReviewSubmitted}
+              onCancel={handleReviewCancel}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

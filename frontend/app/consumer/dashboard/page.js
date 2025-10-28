@@ -4,15 +4,13 @@ import { useState, useEffect } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-import { Search, MapPin, Star, Users, MessageCircle, Filter, Loader2, AlertCircle, Activity, TrendingUp, Milk, Map } from "lucide-react"
+import { MapPin, Star, Users, MessageCircle, Filter, Loader2, AlertCircle, Activity, TrendingUp, Milk, Map, X, SlidersHorizontal } from "lucide-react"
 import { ConsumerNav } from "@/components/consumer-nav"
 import { api } from "@/lib/utils"
 import ConsumerMapPicker from "@/components/ConsumerMapPicker"
 
 export default function ConsumerDashboard() {
-  const [searchQuery, setSearchQuery] = useState("")
   const [location, setLocation] = useState(null)
   const [nearbyFarmers, setNearbyFarmers] = useState([])
   const [loading, setLoading] = useState(false)
@@ -22,7 +20,35 @@ export default function ConsumerDashboard() {
   const [categories, setCategories] = useState([])
   const [showMapView, setShowMapView] = useState(false)
   const [selectedFarmer, setSelectedFarmer] = useState(null)
-
+  const [showFilters, setShowFilters] = useState(() => {
+    // Load filter panel state from localStorage
+    if (typeof window !== 'undefined') {
+      const savedShowFilters = localStorage.getItem('showFarmerFilters')
+      return savedShowFilters === 'true'
+    }
+    return false
+  })
+  const [filters, setFilters] = useState(() => {
+    // Load filters from localStorage on initialization
+    if (typeof window !== 'undefined') {
+      const savedFilters = localStorage.getItem('farmerFilters')
+      if (savedFilters) {
+        try {
+          return JSON.parse(savedFilters)
+        } catch (error) {
+          console.error('Error parsing saved filters:', error)
+        }
+      }
+    }
+    // Default filters
+    return {
+      maxDistance: 50, // km
+      minRating: 0, // 0-5 stars
+      maxRating: 5
+    }
+  })
+  const [filteredFarmers, setFilteredFarmers] = useState([])
+  console.log(filteredFarmers)
   //console.log(consumerConnectionData)
 
   // Fetch categories on component mount
@@ -70,6 +96,60 @@ export default function ConsumerDashboard() {
         setLoading(false)
       }
     }
+  }
+
+  // Save filters to localStorage
+  const saveFiltersToStorage = (newFilters) => {
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem('farmerFilters', JSON.stringify(newFilters))
+      } catch (error) {
+        console.error('Error saving filters to localStorage:', error)
+      }
+    }
+  }
+
+  // Save filter panel state to localStorage
+  const saveFilterPanelState = (isOpen) => {
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem('showFarmerFilters', isOpen.toString())
+      } catch (error) {
+        console.error('Error saving filter panel state:', error)
+      }
+    }
+  }
+
+  // Handle filter changes
+  const handleFilterChange = (filterType, value) => {
+    const newFilters = {
+      ...filters,
+      [filterType]: value
+    }
+    setFilters(newFilters)
+    saveFiltersToStorage(newFilters)
+  }
+
+  // Clear all filters
+  const clearFilters = () => {
+    const defaultFilters = {
+      maxDistance: 50,
+      minRating: 0,
+      maxRating: 5
+    }
+    setFilters(defaultFilters)
+    saveFiltersToStorage(defaultFilters)
+  }
+
+  // Reset filters to default
+  const resetFilters = () => {
+    const defaultFilters = {
+      maxDistance: 50,
+      minRating: 0,
+      maxRating: 5
+    }
+    setFilters(defaultFilters)
+    saveFiltersToStorage(defaultFilters)
   }
 
   // Request user location
@@ -168,9 +248,57 @@ export default function ConsumerDashboard() {
     fetchConsumerConnectionData()
   }, [])
 
+  // Filter farmers based on current filters
+  useEffect(() => {
+    if (nearbyFarmers.length === 0) {
+      setFilteredFarmers([])
+      return
+    }
+
+    const filtered = nearbyFarmers.filter(farmer => {
+      // Filter by distance
+      const distance = parseFloat(farmer.distance.replace(' km', ''))
+      if (distance > filters.maxDistance) return false
+
+      // Filter by rating
+      const rating = farmer.rating || 0
+      if (rating < filters.minRating || rating > filters.maxRating) return false
+
+      return true
+    })
+
+    setFilteredFarmers(filtered)
+  }, [nearbyFarmers, filters])
+
   
   return (
     <div className="min-h-screen bg-background">
+      <style jsx>{`
+        .slider {
+          -webkit-appearance: none;
+          appearance: none;
+          background: #e5e7eb;
+          outline: none;
+          border-radius: 8px;
+        }
+        .slider::-webkit-slider-thumb {
+          -webkit-appearance: none;
+          appearance: none;
+          width: 20px;
+          height: 20px;
+          background: #3b82f6;
+          cursor: pointer;
+          border-radius: 50%;
+        }
+        .slider::-moz-range-thumb {
+          width: 20px;
+          height: 20px;
+          background: #3b82f6;
+          cursor: pointer;
+          border-radius: 50%;
+          border: none;
+        }
+      `}</style>
       <ConsumerNav />
 
       <main className="container py-8 px-5">
@@ -243,28 +371,6 @@ export default function ConsumerDashboard() {
             </div>
           )}
 
-          {/* Search Section */}
-          <div className="max-w-2xl mx-auto">
-            <div className="flex gap-3">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-3 h-5 w-5 text-muted-foreground" />
-                <Input
-                  placeholder="Search for products or farmers..."
-                  className="pl-10 h-12"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                />
-              </div>
-              <Button 
-                size="lg" 
-                className="bg-primary hover:bg-primary/90"
-                onClick={location ? () => fetchNearbyFarmers(location.latitude, location.longitude) : requestLocation}
-              >
-                <MapPin className="h-5 w-5 mr-2" />
-                {location ? "Refresh" : "Near Me"}
-              </Button>
-            </div>
-          </div>
         </div>
 
         {/* Quick Stats */}
@@ -357,7 +463,7 @@ export default function ConsumerDashboard() {
               {location ? "Farmers Near You" : "Local Farmers"}
               {location && (
                 <span className="text-sm font-normal text-muted-foreground ml-2">
-                  ({nearbyFarmers.length} found)
+                  ({filteredFarmers.length} of {nearbyFarmers.length} found)
                 </span>
               )}
             </h2>
@@ -371,12 +477,112 @@ export default function ConsumerDashboard() {
                 <Map className="h-4 w-4 mr-2" />
                 {showMapView ? "List View" : "Map View"}
               </Button>
-              <Button variant="outline" size="sm" className="w-full sm:w-auto">
-                <Filter className="h-4 w-4 mr-2" />
-                Filter
+              <Button 
+                variant={showFilters ? "default" : "outline"} 
+                size="sm" 
+                onClick={() => {
+                  const newState = !showFilters
+                  setShowFilters(newState)
+                  saveFilterPanelState(newState)
+                }}
+                className="w-full sm:w-auto"
+              >
+                <SlidersHorizontal className="h-4 w-4 mr-2" />
+                Filters
+                {Object.values(filters).some(v => v !== 50 && v !== 0 && v !== 5) && (
+                  <span className="ml-1 bg-primary text-primary-foreground text-xs px-1.5 py-0.5 rounded-full">
+                    Active
+                  </span>
+                )}
               </Button>
             </div>
           </div>
+
+          {/* Filter Panel */}
+          {showFilters && (
+            <Card className="mb-6 p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold">Filter Farmers</h3>
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" onClick={resetFilters}>
+                    Reset
+                  </Button>
+                  <Button variant="ghost" size="sm" onClick={() => {
+                    setShowFilters(false)
+                    saveFilterPanelState(false)
+                  }}>
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Distance Filter */}
+                <div>
+                  <label className="block text-sm font-medium mb-2">
+                    Maximum Distance: {filters.maxDistance} km
+                  </label>
+                  <input
+                    type="range"
+                    min="1"
+                    max="100"
+                    value={filters.maxDistance}
+                    onChange={(e) => handleFilterChange('maxDistance', parseInt(e.target.value))}
+                    className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
+                  />
+                  <div className="flex justify-between text-xs text-gray-500 mt-1">
+                    <span>1 km</span>
+                    <span>100 km</span>
+                  </div>
+                </div>
+
+                {/* Rating Filter */}
+                <div>
+                  <label className="block text-sm font-medium mb-2">
+                    Rating Range: {filters.minRating} - {filters.maxRating} stars
+                  </label>
+                  <div className="space-y-3">
+                    <div>
+                      <label className="text-xs text-gray-600">Minimum Rating</label>
+                      <input
+                        type="range"
+                        min="0"
+                        max="5"
+                        step="0.5"
+                        value={filters.minRating}
+                        onChange={(e) => handleFilterChange('minRating', parseFloat(e.target.value))}
+                        className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-600">Maximum Rating</label>
+                      <input
+                        type="range"
+                        min="0"
+                        max="5"
+                        step="0.5"
+                        value={filters.maxRating}
+                        onChange={(e) => handleFilterChange('maxRating', parseFloat(e.target.value))}
+                        className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex justify-between text-xs text-gray-500 mt-1">
+                    <span>0 stars</span>
+                    <span>5 stars</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Filter Summary */}
+              <div className="mt-4 p-3 bg-gray-50 rounded-lg">
+                <p className="text-sm text-gray-600">
+                  Showing farmers within <span className="font-medium">{filters.maxDistance} km</span> 
+                  {' '}with ratings between <span className="font-medium">{filters.minRating}</span> and <span className="font-medium">{filters.maxRating}</span> stars
+                </p>
+              </div>
+            </Card>
+          )}
 
           {/* Map View */}
           {showMapView && (
@@ -384,7 +590,7 @@ export default function ConsumerDashboard() {
               <ConsumerMapPicker
                 onFarmerSelect={handleFarmerSelect}
                 initialLocation={location}
-                farmers={nearbyFarmers}
+                farmers={filteredFarmers}
                 categories={categories}
                 onCategoryChange={handleCategoryChange}
                 onLocationChange={handleLocationChange}
@@ -419,9 +625,25 @@ export default function ConsumerDashboard() {
             </Card>
           )}
 
-          {!loading && nearbyFarmers.length > 0 && (
+          {!loading && nearbyFarmers.length > 0 && filteredFarmers.length === 0 && (
+            <Card className="p-8 text-center">
+              <Filter className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+              <h3 className="text-lg font-semibold mb-2">No Farmers Match Your Filters</h3>
+              <p className="text-muted-foreground mb-4">
+                Try adjusting your distance or rating filters to see more farmers.
+              </p>
+              <Button 
+                onClick={clearFilters}
+                variant="outline"
+              >
+                Clear Filters
+              </Button>
+            </Card>
+          )}
+
+          {!loading && filteredFarmers.length > 0 && (
             <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-              {nearbyFarmers.map((farmer) => (
+              {filteredFarmers.map((farmer) => (
                 <Card key={farmer.id} className="overflow-hidden hover:shadow-lg transition-shadow">
                   <div className="relative aspect-video overflow-hidden bg-muted">
                     <img

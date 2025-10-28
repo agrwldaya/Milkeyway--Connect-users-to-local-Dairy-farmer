@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Package, Users, MessageCircle, Activity, Plus, Edit, Trash2, CheckCircle, XCircle, UserPlus, AlertCircle, MapPin, Upload, ExternalLink } from "lucide-react"
+import { Package, Users, MessageCircle, Activity, Plus, Edit, Trash2, CheckCircle, XCircle, UserPlus, AlertCircle, MapPin, Upload, ExternalLink, Star } from "lucide-react"
 import { FarmerNav } from "@/components/farmer-nav"
 import { api } from "@/lib/utils"
 import { toast } from "sonner"
@@ -146,7 +146,7 @@ export default function FarmerDashboard() {
         )}
 
         {/* Stats Overview */}
-        <div className="grid gap-4 sm:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 mb-6 sm:mb-8">
+        <div className="grid gap-4 sm:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 mb-6 sm:mb-8">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium">Total Products</CardTitle>
@@ -195,6 +195,19 @@ export default function FarmerDashboard() {
               <div className="text-2xl sm:text-3xl font-bold">{stats?.profileViews || 0}</div>
               <p className="text-xs text-muted-foreground mt-1">
                 <span className="text-primary">Total</span> profile views
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium">Average Rating</CardTitle>
+              <Star className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl sm:text-3xl font-bold">{(Number(stats?.averageRating) || 0).toFixed(1)}</div>
+              <p className="text-xs text-muted-foreground mt-1">
+                <span className="text-primary">{stats?.totalReviews || 0}</span> reviews
               </p>
             </CardContent>
           </Card>

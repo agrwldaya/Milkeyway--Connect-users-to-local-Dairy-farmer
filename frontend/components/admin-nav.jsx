@@ -30,6 +30,13 @@ export function AdminNav() {
   const handleLogout = async () => {
     try {
       await api.post("/api/v1/auth/logout")
+      
+      // Clear any consumer filter data from localStorage
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('farmerFilters')
+        localStorage.removeItem('showFarmerFilters')
+      }
+      
       toast.success("Logged out")
     } finally {
       router.push("/")

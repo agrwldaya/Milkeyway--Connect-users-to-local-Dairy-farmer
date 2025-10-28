@@ -49,7 +49,7 @@ farmerRouter.get("/showcategories", showcategories);
 // login farmer
 farmerRouter.post("/login", loginFarmer);
 
-farmerRouter.get("/profile", authMiddleware, verifyFarmer, getFarmerProfile)
+farmerRouter.get("/profile", authMiddleware, verifyFarmer, getFarmerProfile);
 
 // Get farmer dashboard status and restrictions
 farmerRouter.get("/dashboard-status", authMiddleware, verifyFarmer, getFarmerDashboardStatus);

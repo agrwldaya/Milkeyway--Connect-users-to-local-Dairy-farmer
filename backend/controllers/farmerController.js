@@ -566,7 +566,8 @@ export const getFarmerProfile = async (req, res) => {
     const documents = await pool.query("select * from farmer_docs where farmer_id =$1",[farmInfo.rows[0].id]);
 
     const farmerProfile = {
-      id: user_id, // Add the user ID to the response
+      id: farmInfo.rows[0].id, // Use the farmer profile ID, not user ID
+      user_id: user_id, // Also include user ID for reference
       name: user.rows[0].name,
       email: user.rows[0].email,
       phone: user.rows[0].phone,
@@ -990,6 +991,14 @@ export const getFarmerDashboardData = async (req, res) => {
 
     const analytics = farmer.rows[0].analytics;
 
+    // Get rating statistics
+    const ratingStats = {
+      averageRating: Number(farmerInfo.average_rating) || 0,
+      totalReviews: Number(farmerInfo.total_reviews) || 0,
+      ratingDistribution: farmerInfo.rating_distribution || {"1": 0, "2": 0, "3": 0, "4": 0, "5": 0},
+      lastReviewAt: farmerInfo.last_review_at
+    };
+
     res.status(200).json({
       success: true,
       data: {
@@ -998,7 +1007,8 @@ export const getFarmerDashboardData = async (req, res) => {
           totalProducts: parseInt(productsCount.rows[0].count),
           activeConnections: parseInt(connectionsCount.rows[0].count),
           pendingRequests: parseInt(pendingRequestsCount.rows[0].count),
-          profileViews: parseInt(profileViews) || 0
+          profileViews: parseInt(profileViews) || 0,
+          ...ratingStats
         },
         recentRequests: recentRequests.rows,
         recentConnections: recentConnections.rows,

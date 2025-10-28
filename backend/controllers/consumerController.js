@@ -252,6 +252,9 @@ export const getNearbyFarmers = async (req, res) => {
         f.latitude,
         f.longitude,
         f.delivery_radius_km,
+        f.average_rating,
+        f.total_reviews,
+        f.rating_distribution,
         u.is_verified,
         f.status,
         fd.farm_image_url,
@@ -279,7 +282,8 @@ export const getNearbyFarmers = async (req, res) => {
           )
         ) <= $3
       GROUP BY f.id, u.name, u.email, u.phone, f.farm_name, f.address, 
-               f.latitude, f.longitude, f.delivery_radius_km, u.is_verified, f.status,
+               f.latitude, f.longitude, f.delivery_radius_km, f.average_rating, 
+               f.total_reviews, f.rating_distribution, u.is_verified, f.status,
                fd.farm_image_url, fd.farmer_image_url
       ORDER BY distance_km ASC
     `;
@@ -296,11 +300,12 @@ export const getNearbyFarmers = async (req, res) => {
       address: farmer.address,
       latitude: farmer.latitude,
       longitude: farmer.longitude,
-      image: farmer.farm_image_url,
-      coverImage: farmer.farmer_image_url,
+      image: farmer.farmer_image_url,
+      coverImage: farmer.farm_image_url,
       description: "Fresh dairy products from a trusted local farmer.",
-      rating: 4.5, // Default rating since it's not in the current schema
-      reviews: 0, // Default reviews since it's not in the current schema
+      rating: Number(farmer.average_rating) || 0,
+      reviews: Number(farmer.total_reviews) || 0,
+      ratingDistribution: farmer.rating_distribution || {"1": 0, "2": 0, "3": 0, "4": 0, "5": 0},
       products: farmer.product_count || 0,
       distance: `${farmer.distance_km.toFixed(1)} km`,
       verified: farmer.is_verified,
@@ -376,7 +381,7 @@ export const getFarmersByCategory = async (req, res) => {
     const userLng = parseFloat(longitude);
     const searchRadius = parseFloat(radius);
 
-    // Simple test query first
+    // Query to get farmers by category with rating data
     const query = `
     SELECT 
       f.id AS farmer_id,
@@ -385,22 +390,45 @@ export const getFarmersByCategory = async (req, res) => {
       f.address,
       f.latitude,
       f.longitude,
+      f.average_rating,
+      f.total_reviews,
+      f.rating_distribution,
+      u.is_verified,
+      f.status,
+      fd.farm_image_url,
+      fd.farmer_image_url,
       p.name AS product_name,
-      p.price_per_unit AS price_per_unit
+      p.price_per_unit AS price_per_unit,
+      (
+        6371 * acos(
+          cos(radians($2)) * cos(radians(f.latitude)) * 
+          cos(radians(f.longitude) - radians($3)) + 
+          sin(radians($2)) * sin(radians(f.latitude))
+        )
+      ) AS distance_km
     FROM farmer_profiles f
     JOIN users u ON f.user_id = u.id
+    LEFT JOIN farmer_docs fd ON f.id = fd.farmer_id
     JOIN products p ON f.id = p.farmer_id
     WHERE f.status = 'approved'
       AND f.latitude IS NOT NULL
       AND f.longitude IS NOT NULL
       AND p.is_available = true
       AND p.category_id = $1
-    LIMIT 10
+      AND (
+        6371 * acos(
+          cos(radians($2)) * cos(radians(f.latitude)) * 
+          cos(radians(f.longitude) - radians($3)) + 
+          sin(radians($2)) * sin(radians(f.latitude))
+        )
+      ) <= $4
+    ORDER BY distance_km ASC
+    LIMIT 20
   `;
   
 
     //console.log("Executing query with categoryId:", parseInt(categoryId));
-    const result = await pool.query(query, [parseInt(categoryId)]);
+    const result = await pool.query(query, [parseInt(categoryId), userLat, userLng, searchRadius]);
     //console.log("Query result:", result.rows.length, "farmers found");
     
     // Format the response
@@ -411,14 +439,17 @@ export const getFarmersByCategory = async (req, res) => {
       address: farmer.address,
       latitude: farmer.latitude,
       longitude: farmer.longitude,
+      image: farmer.farm_image_url,
+      coverImage: farmer.farmer_image_url,
       description: "Fresh dairy products from a trusted local farmer.",
-      rating: 4.5, // Default rating
-      reviews: 0, // Default reviews
-      products: [{name: farmer.product_name, price: farmer.price_per_unit}], // Empty for now
+      rating: Number(farmer.average_rating) || 0,
+      reviews: Number(farmer.total_reviews) || 0,
+      ratingDistribution: farmer.rating_distribution || {"1": 0, "2": 0, "3": 0, "4": 0, "5": 0},
+      products: [{name: farmer.product_name, price: farmer.price_per_unit}],
       price: `₹${farmer.price_per_unit}`,
-      distance: "0.0 km", // Default distance
-      verified: false, // Default
-      status: "approved"
+      distance: `${farmer.distance_km.toFixed(1)} km`,
+      verified: farmer.is_verified,
+      status: farmer.status
     }));
 
     res.status(200).json({
@@ -466,6 +497,9 @@ export const getFarmerDetails = async (req, res) => {
         f.latitude,
         f.longitude,
         f.delivery_radius_km,
+        f.average_rating,
+        f.total_reviews,
+        f.rating_distribution,
         u.is_verified,
         f.status,
         fd.farm_image_url,
@@ -523,8 +557,9 @@ export const getFarmerDetails = async (req, res) => {
       image: farmer.farm_image_url,
       coverImage: farmer.farmer_image_url,
       description: farmer.farm_description || "Fresh dairy products from a trusted local farmer.",
-      rating: farmer.rating || 0,
-      reviews: farmer.total_reviews || 0,
+      rating: Number(farmer.average_rating) || 0,
+      reviews: Number(farmer.total_reviews) || 0,
+      ratingDistribution: farmer.rating_distribution || {"1": 0, "2": 0, "3": 0, "4": 0, "5": 0},
       deliveryRadius: farmer.delivery_radius_km,
       verified: farmer.is_verified,
       status: farmer.status,
@@ -584,6 +619,8 @@ export const getConsumerProfile = async (req, res) => {
 
     console.log(data);
     const consumerProfileData = {
+      id: user.rows[0].id, // Add user ID to the response
+      user_id: user.rows[0].id, // Also include user_id for compatibility
       name: user.rows[0].name,
       email: user.rows[0].email,
       phone: user.rows[0].phone,

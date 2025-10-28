@@ -19,6 +19,7 @@ import {
   Settings,
   LogOut,
   Menu, // Import the Menu icon for the hamburger
+  Star,
 } from "lucide-react"
 
 export function FarmerNav() {
@@ -29,6 +30,13 @@ export function FarmerNav() {
   const handleLogout = async () => {
     try {
       await api.post("/api/v1/auth/logout")
+      
+      // Clear any consumer filter data from localStorage
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('farmerFilters')
+        localStorage.removeItem('showFarmerFilters')
+      }
+      
       toast.success("Logged out")
     } finally {
       router.push("/")
@@ -40,9 +48,10 @@ export function FarmerNav() {
     { href: "/farmer/products", icon: Package, label: "Products" },
     { href: "/farmer/requests", icon: MessageCircle, label: "Connection Requests" },
     { href: "/farmer/connections", icon: Users, label: "My Connections" },
+    { href: "/farmer/reviews", icon: Star, label: "Reviews" },
     { href: "/farmer/activity", icon: Activity, label: "Activity" },
     { href: "/farmer/profile", icon: User, label: "Profile" },
-    { href: "/farmer/settings", icon: Settings, label: "Settings" },
+    { href: "/farmer/settings", icon: Settings, label: "Settings" }
   ]
 
     // { href: "/farmer/analytics", icon: BarChart3, label: "Analytics" },
