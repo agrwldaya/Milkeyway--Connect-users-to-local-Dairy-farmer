@@ -138,7 +138,7 @@ export default function SignupPage() {
                   isLoading={isLoading}
                 />
               )}
-
+  
               {(step === 2 || step === 3) && role === "farmer" && (
                 <FarmerSignup
                   formData={formData}
